@@ -5,8 +5,6 @@ import exprparse
 import generator
 
 
-LOG_DEBUG = False
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -18,8 +16,11 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    import os
-    LOG_DEBUG = bool(os.getenv("LOG_DEBUG", LOG_DEBUG))
+    import os.path
+    import logging
+    import logging.config
+    if os.path.exists("log_conf.ini"):
+        logging.config.fileConfig("log_conf.ini")
 
     args = parse_args()
     parser = exprparse.Source(args.pattern)

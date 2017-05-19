@@ -1,0 +1,26 @@
+[loggers]
+keys=root,source
+
+[handlers]
+keys=console
+
+[formatters]
+keys=precise
+
+[logger_root]
+level=DEBUG
+handlers=console
+
+[logger_source]
+level=DEBUG
+handlers=console
+qualname=source.parser
+
+[handler_console]
+class=StreamHandler
+level=DEBUG
+formatter=precise
+args=(sys.stderr,)
+
+[formatter_precise]
+format=%(asctime)s %(name)s:%(levelname)s %(filename)s:%(lineno)s %(funcName)s %(message)s 

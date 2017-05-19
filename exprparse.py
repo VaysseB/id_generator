@@ -8,7 +8,7 @@ class Source:
     """Reader of expression."""
 
     def __init__(self, pattern):
-        self.log = logging.getLogger("source")
+        self.log = logging.getLogger("source.parser")
         self.pattern = iter(pattern)
         self.curr = None
         self.escaping = None
@@ -48,7 +48,7 @@ class Source:
             self.raise_error_if_any()
             return
         self.fields.append(field)
-        self.log.debug("Start[{}]".format(self.curr), field)
+        self.log.debug("Start[{}]{}".format(self.curr, field))
 
         self._next()
 
@@ -57,7 +57,7 @@ class Source:
             if field is None:
                 self.log.debug("Search[{}]".format(self.curr))
                 field = find_parser(self)
-                self.log.debug("Found[{}]".format(self.curr), field)
+                self.log.debug("Found[{}]{}".format(self.curr, field))
                 self.raise_error_if_any()
                 assert field is not None, "internal error (cannot parse '{}')".format(self.curr)
 
@@ -71,7 +71,7 @@ class Source:
                 self.fields.append(field)
 
             field = field.parse(self)
-            self.log.debug("Loop[{}]".format(self.curr), field)
+            self.log.debug("Loop[{}]{}".format(self.curr, field))
             self.raise_error_if_any()
             self._next()
 
@@ -81,7 +81,7 @@ class Source:
 
     def raise_error_if_any(self):
         if self.error:
-            self.log.debug("Parsing error:", self.error)
+            self.log.debug("Parsing error: {}".format(self.error))
             exit(1)
 
     def build(self):
