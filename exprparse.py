@@ -4,6 +4,25 @@ import logging
 import generator
 
 
+class ExtractSeq:
+    """Temporary storage for extracted content from the source."""
+
+    def __init__(self):
+        self._seq = []
+
+    def add(self, c: str):
+        self._seq.append(c)
+
+    def str(self) -> str:
+        return "".join(self._seq)
+
+    def int(self, w=10) -> int:
+        return int(self.str(), w)
+
+    def __str__(self):
+        return self.str()
+
+
 class Source:
     """Reader of expression."""
 
@@ -93,12 +112,12 @@ class TextParser:
     """Parser for raw text sequence."""
 
     def __init__(self):
-        self.text = []
+        self.text = ExtractSeq()
 
     def parse(self, source: Source):
         """Parse the current character returns the next parser."""
         if source.consume_escaping():
-            self.text.append(source.curr)
+            self.text.add(source.curr)
         elif source.curr == "[":
             return FieldParser()
         elif source.curr == "]":
@@ -106,32 +125,31 @@ class TextParser:
         elif source.curr == "\\":
             source.enable_escaping()
         else:
-            self.text.append(source.curr)
+            self.text.add(source.curr)
         return self
 
     def build(self):
-        text = "".join(self.text)
-        return generator.FixGenerator(text)
+        return generator.FixGenerator(self.text.str())
 
     def __str__(self):
-        return "text|{}".format("".join(self.text))
+        return "text|{}".format(self.text)
 
 
 class FieldParser:
     """Parser for field (like number range)."""
 
     def __init__(self):
-        self.range_start = []
-        self.range_end = []
+        self.range_start = ExtractSeq()
+        self.range_end = ExtractSeq()
         self.option = {}
         self._parser_state = self._parse_start
 
     def __str__(self):
         return "range|{}/{}/{}{}".format(
-                "".join(self.range_start),
-                "".join(self.range_end),
-                "".join(self.option.get("pad_len", [])),
-                "".join("z" if self.option.get("pad_field", False) else "")
+                self.range_start,
+                self.range_end,
+                self.option.get("pad_len", ""),
+                ("z" if self.option.get("pad_field", False) else "")
                 )
 
     def put_error_if_left(self, source: Source):
@@ -139,7 +157,7 @@ class FieldParser:
 
     def _parse_start(self, source: Source):
         if source.curr.isnumeric():
-            self.range_start.append(source.curr)
+            self.range_start.add(source.curr)
         elif source.curr == "-":
             if not self.range_start:
                 source.parse_error("unspecified start of field")
@@ -152,7 +170,7 @@ class FieldParser:
 
     def _parse_end(self, source: Source):
         if source.curr.isnumeric():
-            self.range_end.append(source.curr)
+            self.range_end.add(source.curr)
         elif source.curr == "|":
             if not self.range_end:
                 source.parse_error("unspecified end of field")
@@ -171,11 +189,12 @@ class FieldParser:
     def _parse_start_of_option(self, source: Source):
         if source.curr.isnumeric():
             if "pad_len" in self.option:
-                source.parse_error("duplication of padding lenght in field option")
+                lenght = self.option["pad_lenght"]
             else:
-                self.option["pad_len"] = [source.curr]
+                pad_len = ExtractSeq()
+                self.option["pad_len"] = pad_len
+            pad_len.add(source.curr)
             self.some_options = True
-            self._parser_state = self._parse_option_pad_len
         elif source.curr == "z":
             if "pad_field" in self.option:
                 source.parse_error("duplication of '{}' in field option".format(source.curr))
@@ -183,21 +202,8 @@ class FieldParser:
                 self.option["pad_field"] = True
             self.some_options = True
             self._parser_state = self._parse_closing
-        else:
-            source.parse_error("expect number or \"z\"")
-        return self
-
-    def _parse_option_pad_len(self, source: Source):
-        if source.curr.isnumeric():
-            assert "pad_len" in self.option, "internal error (impossible situation)"
-            self.option["pad_len"].append(source.curr)
-        elif source.curr == "z":
-            if "pad_field" in self.option:
-                source.parse_error("duplication of '{}' in field option".format(source.curr))
-            else:
-                self.option["pad_field"] = True
-            self.some_options = True
-            self._parser_state = self._parse_closing
+        elif source.curr == "]":
+            return None
         else:
             source.parse_error("expect number or \"z\"")
         return self
@@ -214,12 +220,12 @@ class FieldParser:
         return self._parser_state(source)
 
     def build(self):
-        start = int("".join(self.range_start))
-        end = int("".join(self.range_end))
+        start = self.range_start.int()
+        end = self.range_end.int()
         pad_len = None
         if self.option.get("pad_field", False):
             if "pad_len" in self.option:
-                pad_len = int("".join(self.option["pad_len"]))
+                pad_len = self.option["pad_len"].int()
             else:
                 pad_len = len(str(end))
         return generator.RangeGenerator(start, end, pad_len)
