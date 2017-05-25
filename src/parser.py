@@ -1,133 +1,58 @@
 
+import ast
+from state_machine import PSM, Source
+
+
+#-------------------------------------
+# Group
 
 class Group:
-    """
-    Example: (...), (?:...), (?=...), (?!...), (?<...>...)
-    """
+    def __init__(self, initial=False, prev=None):
+        self.is_initial = initial
+        self.prev = prev
+        self.ast = ast.Group()
 
-    PositiveLookhead = 1
-    NegativeLookhead = -1
-
-    def __init__(self):
-        self.seq = ()
-        self.name = None
-        self.lookhead = None
-        self.quantifier = one_time
-
-
-class MatchBegin:
-    """
-    Example: ^
-    """
-    pass
+    def next(self, psm: PSM):
+        if not self.is_initial and psm.char == "?":
+            return FirstOptionOfGroup(self)
+        elif not self.is_initial and psm.char == ")":
+            return self.prev
+        elif psm.char == "(":
+            g = Group(prev=self)
+            self.ast.seq = self.ast.seq + (g.ast,)
+            return g
 
 
-class MatchEnd:
-    """
-    Example: $
-    """
-    pass
+class FirstOptionOfGroup:
+    def __init__(self, group: Group):
+        self.group = group
+
+    def next(self, psm: PSM):
+        if psm.char == ":":
+            self.group.ast.ignored = True
+            return ContentOfGroup(self.group)
+
+        psm.error = 'expected ":", "<" or "="'
 
 
-class Alternative:
-    """
-    Example: .|.
-    This class cannot be quantified. Only the group it is included in can.
-    """
+class ContentOfGroup:
+    def __init__(self, group: Group):
+        self.group = group
 
-    def __init__(self):
-        self.parts = ()
-
-
-class SingleChar:
-    """
-    Example: any character
-    """
-
-    def __init__(self):
-        self.char = None
-        self.quantifier = one_time
+    def next(self, psm: PSM):
+        if psm.char == ")":
+            return self.group.prev
+        assert False, "not implemented"
 
 
-class PatternChar:
-    r"""
-    Single: \t, \n, \v, \f, \r, \0,
-    Any: \d, \D, \s, \S, \w, \W
-    Special: \xhh \uhhh,
-    Escaped: ^, $, \, ., +, ?, (, ), [, ], {, }, |
-    POSIX: alnum, alpha, blank, cntrl, digit, graph, lower, print, punc, space,
-    upper, xdigit, d, w, s
-    """
 
-    def __init__(self):
-        self.pattern = ""
-        self.posix = False
-        self.quantifier = one_time
+#--------------------------------------
 
-
-class Range:
-    """
-    Example: [a-b]
-    This class must be inside the CharClass, it cannot be used as standalone.
-    """
-
-    def __init__(self):
-        self.begin = None
-        self.end = None
-
-
-class CharClass:
-    """
-    Example: [a], [^a]
-    """
-
-    def __init__(self):
-        self.elems = ()
-        self.negate = False
-        self.quantifier = one_time
-
-
-#-----------------------------------------------------------------------------
-class NoneOrOnce:
-    """
-    Example: .?
-    """
-    pass
-
-class NoneOrMore:
-    """
-    Example: .*
-    """
-    pass
-
-class OneTime:
-    """
-    Example: .
-    """
-    pass
-
-class OneOrMore:
-    """
-    Example: .+
-    """
-    pass
-
-class Between:
-    """
-    Example: .{a,b}
-    """
-    def __init__(self):
-        self.min = None
-        self.max = None
-
-none_or_once = NoneOrOnce()
-none_or_more = NoneOrMore()
-one_time = OneTime()
-one_or_more = OneOrMore()
-one_or_more_ungreedy = OneOrMore()
-
-
-#-----------------------------------------------------------------------------
-def parse(expr):
-    pass
-
+def parse(expr, **kw):
+    sm = PSM()
+    sm.source = Source(expr)
+    sm.starts_with(Group(initial=True))
+    sm.pre_action = kw.get("pre_action", None)
+    sm.post_action = kw.get("post_action", None)
+    sm.parse()
+    return sm.state.ast

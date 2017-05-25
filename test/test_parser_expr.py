@@ -3,6 +3,7 @@ import unittest
 
 import fix_import
 from builder import *
+import ast
 import parser
 
 
@@ -11,14 +12,14 @@ class TestExpressionParser(unittest.TestCase):
     def __init__(self, *args, **kw):
         super(TestExpressionParser, self).__init__(*args, **kw)
         self._asserters = {
-            parser.Group        : self._assertAst_Group,
-            parser.MatchBegin   : self._assertAst_MatchBegin,
-            parser.MatchEnd     : self._assertAst_MatchEnd,
-            parser.Alternative  : self._assertAst_Alternative,
-            parser.SingleChar   : self._assertAst_SingleChar,
-            parser.PatternChar  : self._assertAst_PatternChar,
-            parser.Range        : self._assertAst_Range,
-            parser.CharClass    : self._assertAst_CharClass,
+            ast.Group        : self._assertAst_Group,
+            ast.MatchBegin   : self._assertAst_MatchBegin,
+            ast.MatchEnd     : self._assertAst_MatchEnd,
+            ast.Alternative  : self._assertAst_Alternative,
+            ast.SingleChar   : self._assertAst_SingleChar,
+            ast.PatternChar  : self._assertAst_PatternChar,
+            ast.Range        : self._assertAst_Range,
+            ast.CharClass    : self._assertAst_CharClass,
         }
 
     def assertAstEqual(self, ast, expected):
@@ -192,13 +193,13 @@ class TestExpressionParser(unittest.TestCase):
     def test_parse_group_pos_lookhead(self):
         self._test_parse(
             "(?=a)",
-            Expect().seq("a").close_group(lookhead=parser.Group.PositiveLookhead).build()
+            Expect().seq("a").close_group(lookhead=ast.Group.PositiveLookhead).build()
         )
 
     def test_parse_group_neg_lookhead(self):
         self._test_parse(
             "(?!a)",
-            Expect().seq("a").close_group(lookhead=parser.Group.NegativeLookhead).build()
+            Expect().seq("a").close_group(lookhead=ast.Group.NegativeLookhead).build()
         )
 
     def test_parse_beginning_line(self):
@@ -319,7 +320,7 @@ class TestExpressionParser(unittest.TestCase):
 
     def test_group_with_alt_not_captured(self):
         self._test_parse(
-            "(?:a|?:b)",
+            "(?:a|\\?:b)",
             Expect().alt(
                 Expect().seq("a").ast[0],
                 Expect().seq("?", ":", "b").ast
