@@ -337,13 +337,13 @@ class TestExpressionParser(unittest.TestCase):
 
     def test_char_classes_with_square_bracket(self):
         self._test_parse(
-            "[\][]",
+            "[\\]\\[]",
             Expect().chcls("][").build()
         )
 
     def test_char_classes_with_caret_and_dollar(self):
         self._test_parse(
-            r"[\^$]",
+            "[\\^$]",
             Expect().chcls("^", "$").build()
         )
 
