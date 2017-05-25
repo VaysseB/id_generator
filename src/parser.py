@@ -102,8 +102,12 @@ class ContentOfGroup:
             g = EscapedChar(prev=self.prev)
             self.group.add_ast(g)
             return g
-
-        assert False, "not implemented: {}".format(psm.char)
+# TODO insert here other cases
+        else:
+            c = ast.SingleChar()
+            c.char = psm.char
+            self.group.add(c)
+            return self.prev
 
 
 #--------------------------------------
