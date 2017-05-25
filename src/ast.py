@@ -133,26 +133,31 @@ one_or_more_ungreedy = OneOrMore()
 
 
 #-----------------------------------------------------------------------------
-class Printer:
+class AstFormatter:
     def __init__(self):
-        self.printers = {
-            Group       : self._print_Group,
-            MatchBegin  : self._print_MatchBegin,
-            MatchEnd    : self._print_MatchEnd,
-            Alternative : self._print_Alternative,
-            SingleChar  : self._print_SingleChar,
-            PatternChar : self._print_PatternChar,
-            Range       : self._print_Range,
-            CharClass   : self._print_CharClass,
-            NoneOrOnce  : self._print_NoneOrOnce,
-            NoneOrMore  : self._print_NoneOrMore,
-            OneTime     : self._print_OneTime,
-            OneOrMore   : self._print_OneOrMore,
-            Between     : self._print_Between
+        self.formatters = {
+            Group       : self._format_Group,
+            MatchBegin  : self._format_MatchBegin,
+            MatchEnd    : self._format_MatchEnd,
+            Alternative : self._format_Alternative,
+            SingleChar  : self._format_SingleChar,
+            PatternChar : self._format_PatternChar,
+            Range       : self._format_Range,
+            CharClass   : self._format_CharClass,
+            NoneOrOnce  : self._format_NoneOrOnce,
+            NoneOrMore  : self._format_NoneOrMore,
+            OneTime     : self._format_OneTime,
+            OneOrMore   : self._format_OneOrMore,
+            Between     : self._format_Between
         }
 
-    def print(self, ast, depth=0):
-        self.printers[type(ast)](ast, depth)
+    def print(self, ast):
+        import builtins
+        for line in self._format(ast, depth=0):
+            builtins.print(line)
+
+    def _format(self, ast, depth=0):
+        yield from self.formatters[type(ast)](ast, depth)
 
     def _ident(self, depth):
         if depth <= 0:
@@ -162,72 +167,75 @@ class Printer:
         else:
             return "|  " * (depth - 1) + "|-- "
 
-    def _print(self, depth, *args):
-        import builtins
-        builtins.print(self._ident(depth), *args, sep="")
+    def _inline(self, depth, *args):
+        return self._ident(depth) + "".join(str(x) for x in args)
 
-    def _print_Group(self, group: Group, depth: int):
+    def _format_Group(self, group: Group, depth: int):
         name = (" \"" + group.name + "\"") if group.name is not None else ""
         if depth <= 0:
-            self._print(depth, "root", name)
+            yield self._inline(depth, "root", name)
         else:
-            self._print(depth, "group", name)
+            yield self._inline(depth, "group", name)
         for elem in group.seq:
-            self.print(elem, depth+1)
+            yield from self._format(elem, depth+1)
 
-    def _print_MatchBegin(self, _: MatchBegin, depth: int):
-        self._print(depth, "^begin")
+    def _format_MatchBegin(self, _: MatchBegin, depth: int):
+        yield self._inline(depth, "^begin")
 
-    def _print_MatchEnd(self, _: MatchEnd, depth: int):
-        self._print(depth, "end$")
+    def _format_MatchEnd(self, _: MatchEnd, depth: int):
+        yield self._inline(depth, "end$")
 
-    def _print_Alternative(self, alt: Alternative,  depth: int):
-        self._print(depth, "alt")
+    def _format_Alternative(self, alt: Alternative,  depth: int):
+        yield self._inline(depth, "alt")
         for elem in alt.parts:
-            self.print(elem, depth+1)
+            yield from self._format(elem, depth+1)
 
-    def _print_SingleChar(self, sch: SingleChar, depth: int):
-        self._print(depth, "char: ", sch.char)
+    def _format_SingleChar(self, sch: SingleChar, depth: int):
+        yield self._inline(depth, "char: ", sch.char)
 
-    def _print_PatternChar(self, pch: PatternChar, depth: int):
+    def _format_PatternChar(self, pch: PatternChar, depth: int):
         if pch.type == PatternChar.Posix:
-            self._print(depth, "pattern: [posix] ", pch.pattern)
+            yield self._inline(depth, "pattern: [posix] ", pch.pattern)
         elif pch.type == PatternChar.Unicode:
-            self._print(depth, "pattern: [unicode] ", pch.pattern)
+            yield self._inline(depth, "pattern: [unicode] ", pch.pattern)
         elif pch.type == PatternChar.Ascii:
-            self._print(depth, "pattern: [ascii] ", pch.pattern)
+            yield self._inline(depth, "pattern: [ascii] ", pch.pattern)
         else:
-            self._print(depth, "pattern: ", pch.pattern)
+            yield self._inline(depth, "pattern: ", pch.pattern)
 
-    def _print_Range(self, rng: Range, depth: int):
-        self._print(depth, "range: ", rng.begin, " to ", rng.end)
+    def _format_Range(self, rng: Range, depth: int):
+        yield self._inline(depth,
+                           "range: ",
+                           *self._format(rng.begin),
+                           " to ",
+                           *self._format(rng.end))
 
-    def _print_CharClass(self, chcls: CharClass, depth: int):
-        self._print(depth, "class", " negated" * chcls.negate)
+    def _format_CharClass(self, chcls: CharClass, depth: int):
+        yield self._inline(depth, "class", " negated" * chcls.negate)
         for elem in chcls.elems:
-            self.print(elem, depth+1)
+            yield from self._format(elem, depth+1)
 
-    def _print_NoneOrOnce(self, _: NoneOrOnce, depth: int):
-        self._print(depth, "0 or 1 time")
+    def _format_NoneOrOnce(self, _: NoneOrOnce, depth: int):
+        yield self._inline(depth, "0 or 1 time")
 
-    def _print_NoneOrMore(self, _: NoneOrMore, depth: int):
-        self._print(depth, "0 or more")
+    def _format_NoneOrMore(self, _: NoneOrMore, depth: int):
+        yield self._inline(depth, "0 or more")
 
-    def _print_OneTime(self, _: OneTime, depth: int):
-        self._print(depth, "1 time")
+    def _format_OneTime(self, _: OneTime, depth: int):
+        yield self._inline(depth, "1 time")
 
-    def _print_OneOrMore(self, _: OneOrMore, depth: int):
-        self._print(depth, "1 or more")
+    def _format_OneOrMore(self, _: OneOrMore, depth: int):
+        yield self._inline(depth, "1 or more")
 
-    def _print_Between(self, rpt: Between, depth: int):
+    def _format_Between(self, rpt: Between, depth: int):
         if rpt.min is None:
-            self._print(depth, "up to ", rpt.max, " times")
+            yield self._inline(depth, "up to ", rpt.max, " times")
         elif rpt.max is None:
-            self._print(depth, "at least ", rpt.max, " times")
+            yield self._inline(depth, "at least ", rpt.max, " times")
         else:
-            self._print(depth, "between ", rpt.min, " and ", rpt.max)
+            yield self._inline(depth, "between ", rpt.min, " and ", rpt.max)
 
 
-printer = Printer()
+ast_format = AstFormatter()
 def print(ast):
-    printer.print(ast)
+    ast_format.print(ast)
