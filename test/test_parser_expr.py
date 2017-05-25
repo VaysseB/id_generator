@@ -1,5 +1,6 @@
 
 import unittest
+import itertools
 
 import fix_import
 from builder import *
@@ -20,35 +21,78 @@ class TestExpressionParser(unittest.TestCase):
             ast.PatternChar  : self._assertAst_PatternChar,
             ast.Range        : self._assertAst_Range,
             ast.CharClass    : self._assertAst_CharClass,
+            ast.NoneOrOnce   : self._assertAst_NoneOrOnce,
+            ast.NoneOrMore   : self._assertAst_NoneOrMore,
+            ast.OneTime      : self._assertAst_OneTime,
+            ast.OneOrMore    : self._assertAst_OneOrMore,
+            ast.Between      : self._assertAst_Between
         }
 
     def assertAstEqual(self, ast, expected):
         self.assertEqual(type(ast), type(expected))
         self._asserters[type(ast)](ast, expected)
 
-    def _assertAst_Group(self, group, expected):
+    def _assertAst_Group(self, group: ast.Group, expected: ast.Group):
+        self.assertEqual(group.name, expected.name)
+        self.assertEqual(group.ignored, expected.ignored)
+        self.assertEqual(group.lookhead, expected.lookhead)
+        self.assertAstEqual(group.quantifier, expected.quantifier)
+        for (elem, elem_expected) in itertools.zip_longest(group.seq,
+                                                           expected.seq):
+            self.assertAstEqual(elem, elem_expected)
+
+    def _assertAst_MatchBegin(self, _1, _2):
         pass
 
-    def _assertAst_MatchBegin(self, match, expected):
+    def _assertAst_MatchEnd(self, _1, _2):
         pass
 
-    def _assertAst_MatchEnd(self, match, expected):
+    def _assertAst_Alternative(self, alt: ast.Alternative,
+                               expected: ast.Alternative):
+        for (elem, elem_expected) in itertools.zip_longest(alt.parts,
+                                                           expected.parts):
+            self.assertAstEqual(elem, elem_expected)
+
+    def _assertAst_SingleChar(self, singlechar: ast.SingleChar,
+                              expected: ast.SingleChar):
+        self.assertEqual(singlechar.char, expected.char)
+        self.assertAstEqual(singlechar.quantifier, expected.quantifier)
+
+    def _assertAst_PatternChar(self, pattern: ast.PatternChar,
+                               expected: ast.PatternChar):
+        self.assertEqual(pattern.pattern, expected.pattern)
+        self.assertEqual(pattern.type, expected.type)
+        self.assertAstEqual(pattern.quantifier, expected.quantifier)
         pass
 
-    def _assertAst_Alternative(self, alt, expected):
+    def _assertAst_Range(self, range_: ast.Range, expected: ast.Range):
+        self.assertEqual(range_.begin, expected.begin)
+        self.assertEqual(range_.end, expected.end)
+
+    def _assertAst_CharClass(self, charclass: ast.CharClass,
+                             expected: ast.CharClass):
+        self.assertEqual(charclass.negate, expected.negate)
+        self.assertAstEqual(charclass.quantifier, expected.quantifier)
+        for (elem, elem_expected) in itertools.zip_longest(charclass.elems,
+                                                           expected.elems):
+            self.assertAstEqual(elem, elem_expected)
+
+    def _assertAst_NoneOrOnce(self, _1, _2):
         pass
 
-    def _assertAst_SingleChar(self, singlechar, expected):
+    def _assertAst_NoneOrMore(self, _1, _2):
         pass
 
-    def _assertAst_PatternChar(self, pattern, expected):
+    def _assertAst_OneTime(self, _1, _2):
         pass
 
-    def _assertAst_Range(self, range_, expected):
+    def _assertAst_OneOrMore(self, _1, _2):
         pass
 
-    def _assertAst_CharClass(self, charclass, expected):
-        pass
+    def _assertAst_Between(self, interval: ast.Between, expected: ast.Between):
+        self.assertEqual(interval.min, expected.min)
+        self.assertEqual(interval.max, expected.max)
+
 
     def _test_parse(self, input_expr, expected_ast):
         result = parser.parse(input_expr)
@@ -95,33 +139,33 @@ class TestExpressionParser(unittest.TestCase):
 
     def test_parse_single_special_char(self):
         special_chars = (
-            r"\t",
-            r"\n",
-            r"\v",
-            r"\f",
-            r"\r",
-            r"\0"
+            "t",
+            "n",
+            "v",
+            "f",
+            "r",
+            "0"
 #            r"\x12",
 #            r"\u0001"
         )
         for spc in special_chars:
             self._test_parse(
-                spc,
+                "\\" + spc,
                 Expect().pattch(spc).build()
             )
 
     def test_parse_range_special_char(self):
         special_chars = (
-            r"\d",
-            r"\D",
-            r"\s",
-            r"\S",
-            r"\w",
-            r"\W"
+            "d",
+            "D",
+            "s",
+            "S",
+            "w",
+            "W"
         )
         for spc in special_chars:
             self._test_parse(
-                spc,
+                "\\" + spc,
                 Expect().pattch(spc).build()
             )
 
