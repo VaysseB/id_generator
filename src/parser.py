@@ -3,14 +3,6 @@ import ast
 from state_machine import PSM, Source
 
 
-def find_next(psm: PSM, prev):
-    if psm.char == "(":
-        g = OpeningOfGroup(prev=prev)
-        return g
-
-    assert False, "not implemented: {}".format(psm.char)
-
-
 
 #-------------------------------------
 # Group
@@ -20,19 +12,31 @@ class OpeningOfGroup:
         self.is_initial = initial
         self.prev = prev
         self.ast = ast.Group()
+        self.content_of_initial = ContentOfGroup(self, initial) if initial else None
 
     def next(self, psm: PSM):
         if not self.is_initial and psm.char == "?":
             return FirstOptionOfGroup(self)
-        elif not self.is_initial and psm.char == ")":
-            return self.prev
-
-        state = find_next(psm, self)
-        self.add_ast(state)
-        return state
+        elif psm.char == ")":
+            if self.is_initial:
+                psm.error = 'unexpected ")"'
+            else:
+                return self.prev
+        elif psm.char == "(":
+            g = OpeningOfGroup(prev=self)
+            self.add_ast(g)
+            return g
+        elif self.is_initial:
+            return self.content_of_initial.next(psm)
+        else:
+            c = ContentOfGroup(self)
+            return c.next(psm)
 
     def add_ast(self, other):
-        self.ast.seq = self.ast.seq + (other.ast,)
+        self.add(other.ast)
+
+    def add(self, other):
+        self.ast.seq = self.ast.seq + (other,)
 
 
 class FirstOptionOfGroup:
@@ -71,17 +75,26 @@ class NameOfGroup:
 
 
 class ContentOfGroup:
-    def __init__(self, group: OpeningOfGroup):
+    def __init__(self, group: OpeningOfGroup, initial: bool=False):
         self.group = group
+        self.is_initial = initial
+        self.prev = group if initial else self
 
     def next(self, psm: PSM):
         if psm.char == ")":
-            return self.group.prev
+            if self.is_initial:
+                psm.error = "unbalanced parenthesis"
+            else:
+                return self.group.prev
+        elif psm.char == "(":
+            g = OpeningOfGroup(prev=self.prev)
+            self.group.add_ast(g)
+            return g
+        elif psm.char == "^":
+            self.group.add(ast.MatchBegin())
+            return self.prev
 
-        state = find_next(psm, self)
-        self.group.add_ast(state)
-        return state
-
+        assert False, "not implemented: {}".format(psm.char)
 
 
 #--------------------------------------
