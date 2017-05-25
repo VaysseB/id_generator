@@ -3,10 +3,19 @@ import ast
 from state_machine import PSM, Source
 
 
+def find_next(psm: PSM, prev):
+    if psm.char == "(":
+        g = OpeningOfGroup(prev=prev)
+        return g
+
+    assert False, "not implemented: {}".format(psm.char)
+
+
+
 #-------------------------------------
 # Group
 
-class Group:
+class OpeningOfGroup:
     def __init__(self, initial=False, prev=None):
         self.is_initial = initial
         self.prev = prev
@@ -17,14 +26,17 @@ class Group:
             return FirstOptionOfGroup(self)
         elif not self.is_initial and psm.char == ")":
             return self.prev
-        elif psm.char == "(":
-            g = Group(prev=self)
-            self.ast.seq = self.ast.seq + (g.ast,)
-            return g
+
+        state = find_next(psm, self)
+        self.add_ast(state)
+        return state
+
+    def add_ast(self, other):
+        self.ast.seq = self.ast.seq + (other.ast,)
 
 
 class FirstOptionOfGroup:
-    def __init__(self, group: Group):
+    def __init__(self, group: OpeningOfGroup):
         self.group = group
 
     def next(self, psm: PSM):
@@ -45,7 +57,7 @@ class FirstOptionOfGroup:
 
 
 class NameOfGroup:
-    def __init__(self, group: Group):
+    def __init__(self, group: OpeningOfGroup):
         self.group = group
 
     def next(self, psm: PSM):
@@ -59,17 +71,16 @@ class NameOfGroup:
 
 
 class ContentOfGroup:
-    def __init__(self, group: Group):
+    def __init__(self, group: OpeningOfGroup):
         self.group = group
 
     def next(self, psm: PSM):
         if psm.char == ")":
             return self.group.prev
-        elif psm.char == "(":
-            g = Group(prev=self)
-            self.group.ast.seq = self.group.ast.seq + (g.ast,)
-            return g
-        assert False, "not implemented"
+
+        state = find_next(psm, self)
+        self.group.add_ast(state)
+        return state
 
 
 
@@ -78,7 +89,7 @@ class ContentOfGroup:
 def parse(expr, **kw):
     sm = PSM()
     sm.source = Source(expr)
-    sm.starts_with(Group(initial=True))
+    sm.starts_with(OpeningOfGroup(initial=True))
     sm.pre_action = kw.get("pre_action", None)
     sm.post_action = kw.get("post_action", None)
     sm.parse()
