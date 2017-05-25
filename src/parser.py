@@ -96,8 +96,34 @@ class ContentOfGroup:
         elif psm.char == "$":
             self.group.add(ast.MatchEnd())
             return self.prev
+        elif psm.char == "\\":
+            g = EscapedChar(prev=self.prev)
+            self.group.add_ast(g)
+            return g
 
         assert False, "not implemented: {}".format(psm.char)
+
+
+#--------------------------------------
+class EscapedChar:
+    individual_chars = ('t', 'n', 'v', 'f', 'r', '0')
+    range_chars = ('d', 'D', 'w', 'W', 's', 'S')
+    special_chars = ('^', '$', '[', ']', '(', ')', '{', '}', '\\', '.', '*',
+                     '?', '+', '|')
+
+    def __init__(self, prev):
+        self.prev = prev
+        self.ast = ast.PatternChar()
+
+    def next(self, psm: PSM):
+        if psm.char in EscapedChar.individual_chars \
+           or psm.char in EscapedChar.range_chars \
+           or psm.char in EscapedChar.special_chars:
+            self.ast.pattern = psm.char
+            return self.prev
+        # TODO \xhh and \uhhh
+        else:
+            psm.error = "unauthorized escape of {}".format(psm.char)
 
 
 #--------------------------------------
