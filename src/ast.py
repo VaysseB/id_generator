@@ -51,6 +51,10 @@ class SingleChar:
 
 
 class PatternChar:
+    Ascii = 1
+    Unicode = 2
+    Posix = 3
+
     r"""
     Single: \t, \n, \v, \f, \r, \0,
     Any: \d, \D, \s, \S, \w, \W
@@ -62,7 +66,7 @@ class PatternChar:
 
     def __init__(self):
         self.pattern = ""
-        self.posix = False
+        self.type = None
         self.quantifier = one_time
 
 
@@ -186,8 +190,12 @@ class Printer:
         self._print(depth, "char: ", sch.char)
 
     def _print_PatternChar(self, pch: PatternChar, depth: int):
-        if pch.posix:
-            self._print(depth, "pattern: [:", pch.pattern, ":]")
+        if pch.type == PatternChar.Posix:
+            self._print(depth, "pattern: [posix] ", pch.pattern)
+        elif pch.type == PatternChar.Unicode:
+            self._print(depth, "pattern: [unicode] ", pch.pattern)
+        elif pch.type == PatternChar.Ascii:
+            self._print(depth, "pattern: [ascii] ", pch.pattern)
         else:
             self._print(depth, "pattern: ", pch.pattern)
 

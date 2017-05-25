@@ -100,9 +100,9 @@ class TestExpressionParser(unittest.TestCase):
             r"\v",
             r"\f",
             r"\r",
-            r"\0",
-            r"\ca",
-            r"\u0001"
+            r"\0"
+#            r"\x12",
+#            r"\u0001"
         )
         for spc in special_chars:
             self._test_parse(
@@ -169,7 +169,7 @@ class TestExpressionParser(unittest.TestCase):
         for spc in posix_classes:
             self._test_parse(
                 "[:{}:]".format(spc),
-                Expect().pattch(spc, posix=True).build()
+                Expect().pattch(spc, type=ast.PatternChar.Posix).build()
             )
 
     def test_parse_group(self):

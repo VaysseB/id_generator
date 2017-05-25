@@ -1,4 +1,6 @@
 
+import string
+
 import ast
 from state_machine import PSM, Source
 
@@ -121,13 +123,42 @@ class EscapedChar:
            or psm.char in EscapedChar.special_chars:
             self.ast.pattern = psm.char
             return self.prev
-        # TODO \xhh and \uhhh
+        elif psm.char == "x":
+            return AsciiChar(self)
+        elif psm.char == "u":
+            return UnicodeChar(self)
         else:
             psm.error = "unauthorized escape of {}".format(psm.char)
 
 
-#--------------------------------------
+class AsciiChar:
+    def __init__(self, ech: EscapedChar):
+        self.ech = ech
+        self.ech.ast.type = ast.PatternChar.Ascii
 
+    def next(self, psm: PSM):
+        if psm.char in string.hexdigits:
+            self.ech.ast.pattern += psm.char
+            count = len(self.ech.ast.pattern)
+            return self.ech.prev if count >= 2 else self
+        else:
+            psm.error = "expected ASCII letter or digit"
+
+class UnicodeChar:
+    def __init__(self, ech: EscapedChar):
+        self.ech = ech
+        self.ech.ast.type = ast.PatternChar.Unicode
+
+    def next(self, psm: PSM):
+        if psm.char in string.hexdigits:
+            self.ech.ast.pattern += psm.char
+            count = len(self.ech.ast.pattern)
+            return self.ech.prev if count >= 4 else self
+        else:
+            psm.error = "expected ASCII letter or digit"
+
+
+#-------------------------------------
 def parse(expr, **kw):
     sm = PSM()
     sm.source = Source(expr)
