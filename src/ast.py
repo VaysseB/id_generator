@@ -163,10 +163,11 @@ class Printer:
         builtins.print(self._ident(depth), *args, sep="")
 
     def _print_Group(self, group: Group, depth: int):
+        name = (" \"" + group.name + "\"") if group.name is not None else ""
         if depth <= 0:
-            self._print(depth, "root")
+            self._print(depth, "root", name)
         else:
-            self._print(depth, "group")
+            self._print(depth, "group", name)
         for elem in group.seq:
             self.print(elem, depth+1)
 
