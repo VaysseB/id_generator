@@ -130,7 +130,7 @@ class TestExpressionParser(unittest.TestCase):
             ".",
             "^",
             "$",
-            r"\\",
+            "\\",
             "*",
             "+",
             "?",
@@ -144,7 +144,7 @@ class TestExpressionParser(unittest.TestCase):
         )
         for ech in escaped_chars:
             self._test_parse(
-                r"\\" + ech,
+                "\\" + ech,
                 Expect().pattch(ech).build()
             )
 
@@ -268,7 +268,7 @@ class TestExpressionParser(unittest.TestCase):
     def test_parse_quantifier_non_greedy(self):
         self._test_parse(
             "a+?",
-            Expect().seq("a").q_1n(greedy=False)
+            Expect().seq("a").q_1n(greedy=False).build()
         )
 
 #-----------------------------------------------------------------------------
