@@ -6,6 +6,18 @@ from state_machine import PSM, Source
 
 
 
+
+class SpecialPattern:
+    individual_chars = ('t', 'n', 'v', 'f', 'r', '0')
+    range_chars = ('d', 'D', 'w', 'W', 's', 'S')
+    special_chars = ('^', '$', '[', ']', '(', ')', '{', '}', '\\', '.', '*',
+                     '?', '+', '|')
+    posix_classes = ("alnum", "alpha", "blank", "cntrl", "digit", "graph",
+                     "lower", "print", "punct", "space", "upper", "xdigit",
+                     "d", "w", "s")
+    min_len_posix_class = 1
+
+
 #-------------------------------------
 # Group
 
@@ -82,27 +94,41 @@ class ContentOfGroup:
         self.is_initial = initial
         self.prev = group if initial else self
 
+    def add(self, other):
+        self.group.add(other)
+
     def next(self, psm: PSM):
+
         if psm.char == ")":
             if self.is_initial:
                 psm.error = "unbalanced parenthesis"
             else:
                 return self.group.prev
+
         elif psm.char == "(":
             g = OpeningOfGroup(prev=self.prev)
             self.group.add_ast(g)
             return g
+
         elif psm.char == "^":
             self.group.add(ast.MatchBegin())
             return self.prev
+
         elif psm.char == "$":
             self.group.add(ast.MatchEnd())
             return self.prev
+
         elif psm.char == "\\":
             g = EscapedChar(prev=self.prev)
             self.group.add_ast(g)
             return g
+
+        elif psm.char == "[":
+            r = CharClass(prev=self.prev)
+            return r
+
 # TODO insert here other cases
+
         else:
             c = ast.SingleChar()
             c.char = psm.char
@@ -112,19 +138,15 @@ class ContentOfGroup:
 
 #--------------------------------------
 class EscapedChar:
-    individual_chars = ('t', 'n', 'v', 'f', 'r', '0')
-    range_chars = ('d', 'D', 'w', 'W', 's', 'S')
-    special_chars = ('^', '$', '[', ']', '(', ')', '{', '}', '\\', '.', '*',
-                     '?', '+', '|')
 
     def __init__(self, prev):
         self.prev = prev
         self.ast = ast.PatternChar()
 
     def next(self, psm: PSM):
-        if psm.char in EscapedChar.individual_chars \
-           or psm.char in EscapedChar.range_chars \
-           or psm.char in EscapedChar.special_chars:
+        if psm.char in SpecialPattern.individual_chars \
+           or psm.char in SpecialPattern.range_chars \
+           or psm.char in SpecialPattern.special_chars:
             self.ast.pattern = psm.char
             return self.prev
         elif psm.char == "x":
@@ -160,6 +182,116 @@ class UnicodeChar:
             return self.ech.prev if count >= 4 else self
         else:
             psm.error = "expected ASCII letter or digit"
+
+
+#-------------------------------------
+class CharClass:
+    def __init__(self, prev):
+        self.prev = prev # ContentOfGroup or CharClass
+        self.ast = ast.CharClass()
+        self.next_is_range = False
+
+    def next(self, psm: PSM):
+        this_should_be_range = self.next_is_range
+        self.next_is_range = False
+
+        if this_should_be_range and psm.char != "]":
+            self.next_is_range = False
+            r = ast.Range()
+            r.begin = self.ast.elems[-1]
+            r.end = ast.SingleChar()
+            r.end.char = psm.char
+            self.swap_last(r)
+            return self
+
+        elif psm.char == "\\":
+            s = EscapedChar(prev=self)
+            self.add(s.ast)
+            return s
+
+        elif psm.char == "^":
+            if not self.empty:
+                psm.error = 'caret "^" must be escaped or at the begining'
+            self.ast.negate = True
+            return self
+
+        elif psm.char == "]":
+            if this_should_be_range:
+                s = ast.SingleChar()
+                s.char = "-"
+                self.add(s)
+            else:
+                self.mutate_if_posix_like()
+
+            self.prev.add(self.ast)
+            return self.prev
+
+        elif psm.char == "[":
+            c = CharClass(prev=self)
+            return c
+
+        elif psm.char == "-" and len(self.ast.elems) >= 1:
+            self.next_is_range = True
+            return self
+
+        else:
+            s = ast.SingleChar()
+            s.char = psm.char
+            self.add(s)
+            return self
+
+
+    @property
+    def empty(self):
+        return not self.ast.elems
+
+    def add(self, other):
+        self.ast.elems = self.ast.elems + (other,)
+
+    def swap_last(self, other):
+        self.ast.elems = self.ast.elems[:-1] + (other,)
+
+    def mutate_if_posix_like(self):
+        """
+        Change from character class to pattern char if the content is matching
+        POSIX-like classe.
+        """
+        # put in this variable everything that had happen but not saved into
+        # the single char object
+        # because mutation is only possible if the exact string of the content
+        # match a pre-definied list, so if an unlogged char is consumed, it
+        # must prevent mutation
+        can_mutate = self.ast.negate is False
+        if not can_mutate:
+            return
+
+        if len(self.ast.elems) < SpecialPattern.min_len_posix_class + 2:
+            return
+
+        opening = self.ast.elems[0]
+        if not isinstance(opening, ast.SingleChar) or opening.char != ":":
+            return
+
+        closing = self.ast.elems[-1]
+        if not isinstance(closing, ast.SingleChar) or closing.char != ":":
+            return
+
+        is_only_ascii = lambda x: (isinstance(x, ast.SingleChar)
+                                   and len(x.char) == 1
+                                   and x.char.isalpha())
+        class_may_be_a_word = not any(
+            not is_only_ascii(x) for x in self.ast.elems[1:-1])
+        if not class_may_be_a_word:
+            return
+
+        word = "".join(s.char for s in self.ast.elems[1:-1])
+        if word not in SpecialPattern.posix_classes:
+            return
+
+        p = ast.PatternChar()
+        p.pattern = word
+        p.type = ast.PatternChar.Posix
+        self.ast = p
 
 
 #-------------------------------------
