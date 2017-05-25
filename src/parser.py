@@ -93,6 +93,9 @@ class ContentOfGroup:
         elif psm.char == "^":
             self.group.add(ast.MatchBegin())
             return self.prev
+        elif psm.char == "$":
+            self.group.add(ast.MatchEnd())
+            return self.prev
 
         assert False, "not implemented: {}".format(psm.char)
 
