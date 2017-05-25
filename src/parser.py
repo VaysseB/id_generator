@@ -31,8 +31,31 @@ class FirstOptionOfGroup:
         if psm.char == ":":
             self.group.ast.ignored = True
             return ContentOfGroup(self.group)
+        elif psm.char == "!":
+            self.group.ast.lookhead = ast.Group.NegativeLookhead
+            return ContentOfGroup(self.group)
+        elif psm.char == "=":
+            self.group.ast.lookhead = ast.Group.PositiveLookhead
+            return ContentOfGroup(self.group)
+        elif psm.char == "<":
+            self.group.ast.name = ""
+            return NameOfGroup(self.group)
 
-        psm.error = 'expected ":", "<" or "="'
+        psm.error = 'expected ":", "!", "<" or "="'
+
+
+class NameOfGroup:
+    def __init__(self, group: Group):
+        self.group = group
+
+    def next(self, psm: PSM):
+        if psm.char.isalpha() or psm.char == "_":
+            self.group.ast.name += psm.char
+            return self
+        elif psm.char == ">":
+            return self.group
+
+        psm.error = 'expected a letter, "_" or ">"'
 
 
 class ContentOfGroup:
