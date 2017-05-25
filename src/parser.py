@@ -42,6 +42,10 @@ class ContentOfGroup:
     def next(self, psm: PSM):
         if psm.char == ")":
             return self.group.prev
+        elif psm.char == "(":
+            g = Group(prev=self)
+            self.group.ast.seq = self.group.ast.seq + (g.ast,)
+            return g
         assert False, "not implemented"
 
 
