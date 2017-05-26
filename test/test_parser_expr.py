@@ -118,13 +118,13 @@ class TestBaseOfExpression(AstTester):
     def test_parse_number_range(self):
         self._test_parse(
             "[1-4]",
-            (be.class_(be.rang("1", "4")),)
+            (be.class_(be.rang_ch("1", "4")),)
         )
 
     def test_parse_character_range(self):
         self._test_parse(
             "[a-z]",
-            (be.class_(be.rang("a", "z")),)
+            (be.class_(be.rang_ch("a", "z")),)
         )
 
     def test_parse_avoid_character_class_individual(self):
@@ -136,7 +136,7 @@ class TestBaseOfExpression(AstTester):
     def test_parse_avoid_range(self):
         self._test_parse(
             "[^B-C]",
-            (be.class_(be.rang("B", "C"), reverse=True),)
+            (be.class_(be.rang_ch("B", "C"), reverse=True),)
         )
 
     def test_parse_single_special_char(self):
@@ -388,7 +388,7 @@ class TestOfCommonTrap(AstTester):
         self._test_parse(
             "[a-b-]",
             (be.class_(
-                be.rang("a", "b"),
+                be.rang_ch("a", "b"),
                 be.ch("-")
             ),)
         )

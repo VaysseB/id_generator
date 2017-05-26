@@ -49,13 +49,23 @@ def class_(*items, reverse=False, quant=1) -> ast.CharClass:
 
 
 def rang(begin, end) -> ast.Range:
-    assert isinstance(begin, (str, int)), "begin of Range must be str or int"
-    assert isinstance(end, (str, int)), "end of Range must be str or int"
+    assert isinstance(begin, (ast.SingleChar, ast.PatternChar)), \
+                "begin of Range must be SingleChar or PatternChar"
+    assert isinstance(end, (ast.SingleChar, ast.PatternChar)), \
+                "end of Range must be SingleChar or PatternChar"
 
     t = ast.Range()
     t.begin = begin
     t.end = end
     return t
+
+
+def rang_ch(begin, end) -> ast.Range:
+    sb = ast.SingleChar()
+    sb.char = begin
+    se = ast.SingleChar()
+    se.char = end
+    return rang(sb, se)
 
 
 def ptrn(c: str, type=None, quant=1) -> ast.PatternChar:

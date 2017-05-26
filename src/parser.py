@@ -321,7 +321,16 @@ class CharClass:
         this_is_empty = self.empty
         self.empty = False
 
-        if this_should_be_range and psm.char != "]":
+        if psm.char == "\\":
+            self.can_mutate = False
+            self.next_is_range = this_should_be_range
+
+            s = EscapedChar(prev=self,
+                            escapables_chars=CharClass.all_chars)
+            self.add(s.ast)
+            return s
+
+        elif this_should_be_range and psm.char != "]":
             self.next_is_range = False
             r = ast.Range()
             r.begin = self.ast.elems[-1]
@@ -329,14 +338,6 @@ class CharClass:
             r.end.char = psm.char
             self.swap_last(r)
             return self
-
-        elif psm.char == "\\":
-            self.can_mutate = False
-
-            s = EscapedChar(prev=self,
-                            escapables_chars=CharClass.all_chars)
-            self.add(s.ast)
-            return s
 
         elif psm.char == "^":
             # if at the begining, it has a special meaning
