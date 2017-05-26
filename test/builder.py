@@ -3,109 +3,91 @@ import fix_import
 import ast
 
 
-class Expect:
-    def __init__(self):
-        self.ast = []
+def _make_quantifier(q):
+    if q == 1 or q == "1":
+        return ast.OneTime()
 
-    def seq(self, *text):
-        for c in text:
-            s = ast.SingleChar()
-            s.char = c
-            self.ast.append(s)
-        return self
+    qt = None
+    ungreedy = q.endswith("?") and len(q) >= 2
+    q = q[:-1] if ungreedy else q
 
-    def chcls(self, *elems, **kw):
-        s = ast.CharClass()
-        if kw.get("dont_sequence", False):
-            s.elems = tuple(elems)
-        else:
-            s.elems = tuple(Expect().seq(*elems).ast)
-        s.__dict__.update(kw)
-        self.ast.append(s)
-        return self
+    if q == "?":
+        qt = ast.NoneOrOnce()
+    elif q == "*":
+        qt = ast.NoneOrMore()
+    elif q == "+":
+        qt = ast.OneOrMore()
+    else:
+        min_, max_ = q.split(",")
+        qt = ast.Between()
+        qt.min = int(min_) if min_ else None
+        qt.max = int(max_) if max_ else None
 
-    def raw_rng(self, begin, end):
-        s = ast.Range()
-        s.begin = ast.SingleChar()
-        s.begin.char = begin
-        s.end = ast.SingleChar()
-        s.end.char = end
-        self.ast.append(s)
-        return self
-
-    def chrng(self, begin, end, **kw):
-        c = ast.CharClass()
-        c.elems = (Expect().raw_rng(begin, end).ast[0],)
-        c.__dict__.update(kw)
-        self.ast.append(c)
-        return self
-
-    numrng = chrng
-
-    def pattch(self, text, **kw):
-        s = ast.PatternChar()
-        s.pattern = text
-        s.__dict__.update(kw)
-        self.ast.append(s)
-        return self
-
-    def close_group(self, **kw):
-        g = ast.Group()
-        g.seq = tuple(self.ast)
-        g.__dict__.update(kw)
-        self.ast = [g]
-        return self
-
-    def bol(self):
-        t = ast.MatchBegin()
-        self.ast.append(t)
-        return self
-
-    def eol(self):
-        t = ast.MatchEnd()
-        self.ast.append(t)
-        return self
-
-    def raw_alt(self, *parts):
-        t = ast.Alternative()
-        t.elems = tuple(parts)
-        self.ast.append(t)
-        return self
-
-    def q_maybe(self, greedy=True):
-        q = ast.NoneOrOnce()
-        q.greedy = greedy
-        self.ast[-1].quantifier = q
-        return self
-
-    def q_0n(self, greedy=True):
-        q = ast.NoneOrMore()
-        q.greedy = greedy
-        self.ast[-1].quantifier = q
-        return self
-
-    def q_1(self):
-        self.ast[-1].quantifier = ast.OneTime()
-        return self
-
-    def q_1n(self, greedy=True):
-        q = ast.OneOrMore()
-        q.greedy = greedy
-        self.ast[-1].quantifier = q
-        return self
-
-    def q_rng(self, min_, max_, greedy=True):
-        r = ast.Between()
-        r.min = min_
-        r.max = max_
-        r.greedy = greedy
-        self.ast[-1].quantifier = r
-        return self
+    qt.greedy = not ungreedy
+    return qt
 
 
-    def build(self, **kw):
-        root = ast.Group()
-        root.seq = tuple(self.ast)
-        root.__dict__.update(kw)
-        return root
+def ch(c: str, quant=1) -> ast.SingleChar:
+    assert isinstance(c, str), "character of SingleChar must be str"
+    t = ast.SingleChar()
+    t.char = c
+    t.quantifier = _make_quantifier(quant)
+    return t
+
+
+def class_(*items, reverse=False, quant=1) -> ast.CharClass:
+    for item in items:
+        error = ("item of CharClass must be SingleChar or PatternChar or Range, not "
+                    + type(item).__qualname__)
+        assert isinstance(item, (ast.SingleChar, ast.PatternChar, ast.Range)), error
+
+    t = ast.CharClass()
+    t.elems = tuple(items)
+    t.quantifier = _make_quantifier(quant)
+    t.negate = reverse
+    return t
+
+
+def rang(begin, end) -> ast.Range:
+    assert isinstance(begin, (str, int)), "begin of Range must be str or int"
+    assert isinstance(end, (str, int)), "end of Range must be str or int"
+
+    t = ast.Range()
+    t.begin = begin
+    t.end = end
+    return t
+
+
+def ptrn(c: str, type=None, quant=1) -> ast.PatternChar:
+    assert isinstance(c, str), "character of PatternChar must be str"
+    t = ast.SingleChar()
+    t.pattern = c
+    t.quantifier = _make_quantifier(quant)
+    if type is not None:
+        t.type = type
+    return t
+
+
+def grp(*items, name=None, ign=None, lkhead=None, quant=1) -> ast.Group:
+    t = ast.Group()
+    t.seq = tuple(items)
+    t.quantifier = _make_quantifier(quant)
+    t.ignored = t.ignored if ign is None else ign
+    t.name = t.name if name is None else name
+    t.lookhead = t.lookhead if lkhead else lkhead
+    return t
+
+
+def bol() -> ast.MatchBegin:
+    return ast.MatchBegin()
+
+
+def eol() -> ast.MatchEnd:
+    return ast.MatchEnd()
+
+
+def alt(*items) -> ast.Alternative:
+    t = ast.Alternative()
+    t.elems = tuple(items)
+    return t
 

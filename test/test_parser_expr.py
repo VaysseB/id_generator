@@ -3,7 +3,7 @@ import unittest
 import itertools
 
 import fix_import
-from builder import *
+import builder as be
 import ast
 import parser
 
@@ -62,7 +62,6 @@ class AstTester(unittest.TestCase):
         self.assertEqual(pattern.pattern, expected.pattern)
         self.assertEqual(pattern.type, expected.type)
         self.assertAstEqual(pattern.quantifier, expected.quantifier)
-        pass
 
     def _assertAst_Range(self, range_: ast.Range, expected: ast.Range):
         self.assertAstEqual(range_.begin, expected.begin)
@@ -92,9 +91,9 @@ class AstTester(unittest.TestCase):
         self.assertEqual(interval.min, expected.min)
         self.assertEqual(interval.max, expected.max)
 
-
-    def _test_parse(self, input_expr, expected_ast):
+    def _test_parse(self, input_expr: str, expected: tuple):
         result = parser.parse(input_expr)
+        expected_ast = be.grp(*expected)
         self.assertAstEqual(result, expected_ast)
 
 
@@ -107,37 +106,37 @@ class TestBaseOfExpression(AstTester):
     def test_parse_sequence(self):
         self._test_parse(
             "aB",
-            Expect().seq("a", "B").build()
+            (be.ch("a"), be.ch("B"))
         )
 
     def test_parse_character_class_individual(self):
         self._test_parse(
             "[aB]",
-            Expect().chcls("a", "B").build()
+            (be.class_(be.ch("a"), be.ch("B")),)
         )
 
     def test_parse_number_range(self):
         self._test_parse(
             "[1-4]",
-            Expect().numrng("1", "4").build()
+            (be.class_(be.rang("1", "4")),)
         )
 
     def test_parse_character_range(self):
         self._test_parse(
             "[a-z]",
-            Expect().chrng("a", "z").build()
+            (be.class_(be.rang("a", "z")),)
         )
 
     def test_parse_avoid_character_class_individual(self):
         self._test_parse(
             "[^a]",
-            Expect().chcls("a", negate=True).build()
+            (be.class_(be.ch("a"), reverse=True),)
         )
 
     def test_parse_avoid_range(self):
         self._test_parse(
             "[^B-C]",
-            Expect().chrng("B", "C", negate=True).build()
+            (be.class_(be.rang("B", "C"), reverse=True),)
         )
 
     def test_parse_single_special_char(self):
@@ -154,7 +153,7 @@ class TestBaseOfExpression(AstTester):
         for spc in special_chars:
             self._test_parse(
                 "\\" + spc,
-                Expect().pattch(spc).build()
+                (be.ptrn(spc),)
             )
 
     def test_parse_range_special_char(self):
@@ -169,7 +168,7 @@ class TestBaseOfExpression(AstTester):
         for spc in special_chars:
             self._test_parse(
                 "\\" + spc,
-                Expect().pattch(spc).build()
+                (be.ptrn(spc),)
             )
 
     def test_parse_escaped_char(self):
@@ -192,8 +191,14 @@ class TestBaseOfExpression(AstTester):
         for ech in escaped_chars:
             self._test_parse(
                 "\\" + ech,
-                Expect().pattch(ech).build()
+                (be.ch(ech),)
             )
+
+    def test_parse_dot_as_generic(self):
+        self._test_parse(
+            ".",
+            (be.ptrn("."),)
+        )
 
     def test_parse_posix_classes(self):
         posix_classes = (
@@ -216,106 +221,124 @@ class TestBaseOfExpression(AstTester):
         for spc in posix_classes:
             self._test_parse(
                 "[:{}:]".format(spc),
-                Expect().pattch(spc, type=ast.PatternChar.Posix).build()
+                (be.ptrn(spc, type=ast.PatternChar.Posix),)
             )
 
     def test_parse_group(self):
         self._test_parse(
             "(a)",
-            Expect().seq("a").close_group().build()
+            (be.grp(be.ch("a")),)
         )
 
     def test_parse_group_ignored(self):
         self._test_parse(
             "(?:a)",
-            Expect().seq("a").close_group(ignored=True).build()
+            (be.grp(be.ch("a"), ign=True),)
         )
 
     def test_parse_group_named(self):
         self._test_parse(
             "(?<name>a)",
-            Expect().seq("a").close_group(name="name").build()
+            (be.grp(be.ch("a"), name="name"),)
         )
 
     def test_parse_group_pos_lookhead(self):
         self._test_parse(
             "(?=a)",
-            Expect().seq("a").close_group(lookhead=ast.Group.PositiveLookhead).build()
+            (be.grp(be.ch("a"), lkhead=ast.Group.PositiveLookhead),)
         )
 
     def test_parse_group_neg_lookhead(self):
         self._test_parse(
             "(?!a)",
-            Expect().seq("a").close_group(lookhead=ast.Group.NegativeLookhead).build()
+            (be.grp(be.ch("a"), lkhead=ast.Group.NegativeLookhead),)
         )
 
     def test_parse_beginning_line(self):
         self._test_parse(
             "^a",
-            Expect().bol().seq("a").build()
+            (be.bol(), be.ch("a"))
         )
 
     def test_parse_ending_line(self):
         self._test_parse(
             "a$",
-            Expect().seq("a").eol().build()
+            (be.ch("a"), be.eol())
         )
 
     def test_parse_alt(self):
         self._test_parse(
             "a|b",
-            Expect().raw_alt(
-                Expect().seq("a").ast[0],
-                Expect().seq("b").ast[0]
-            ).build()
+            (be.alt(
+                (be.ch("a"),),
+                (be.ch("b"),)
+            ),)
         )
 
     def test_parse_quantifier_maybe_one(self):
         self._test_parse(
             "a?",
-            Expect().seq("a").q_maybe().build()
+            (be.ch("a", quant="?"),)
         )
 
     def test_parse_quantifier_only_one(self):
         self._test_parse(
             "a",
-            Expect().seq("a").q_1().build()
+            (be.ch("a", quant="1"),)
         )
 
     def test_parse_quantifier_one_or_more(self):
         self._test_parse(
             "a+",
-            Expect().seq("a").q_1n().build()
+            (be.ch("a", quant="+"),)
         )
 
     def test_parse_quantifier_zero_or_more(self):
         self._test_parse(
             "a*",
-            Expect().seq("a").q_0n().build()
+            (be.ch("a", quant="*"),)
         )
 
     def test_parse_repeat_from(self):
         self._test_parse(
             "a{1,}",
-            Expect().seq("a").q_rng(1,None).build()
+            (be.ch("a", quant="1,"),)
         )
 
     def test_parse_repeat_up_to(self):
         self._test_parse(
             "a{,2}",
-            Expect().seq("a").q_rng(None,2).build()
+            (be.ch("a", quant=",2"),)
         )
 
     def test_parse_repeat(self):
         self._test_parse(
             "a{1,2}",
-            Expect().seq("a").q_rng(1,2).build()
+            (be.ch("a", quant="1,2"),)
         )
 
-    def test_parse_quantifier_non_greedy(self):
+    def test_parse_quantifier_non_greedy_maybe_one(self):
+        self._test_parse(
+            "a??",
+            (be.ch("a", quant="??"),)
+        )
+
+    def test_parse_quantifier_non_greedy_one_or_more(self):
         self._test_parse(
             "a+?",
-            Expect().seq("a").q_1n(greedy=False).build()
+            (be.ch("a", quant="+?"),)
+        )
+
+    def test_parse_quantifier_non_greedy_zero_or_more(self):
+        self._test_parse(
+            "a*?",
+            (be.ch("a", quant="*?"),)
+        )
+
+    def test_parse_repeat_non_greedy(self):
+        self._test_parse(
+            "a{1,2}?",
+            (be.ch("a", quant="1,2?"),)
         )
 
 
@@ -328,57 +351,64 @@ class TestOfCommonTrap(AstTester):
     def test_char_classes_with_posix_at_begin(self):
         self._test_parse(
             "[[:digit:]a]",
-            Expect().chcls(
-                Expect().pattch(":digit:").ast[0],
-                Expect().seq("a").ast[0]
-            ).build()
+            (be.class_(
+                be.ptrn("digit", type=ast.PatternChar.Posix),
+                be.ch("a")
+            ),)
         )
 
     def test_char_classes_with_posix_at_end(self):
         self._test_parse(
             "[a[:digit:]]",
-            Expect().chcls(
-                Expect().seq("a").ast[0],
-                Expect().pattch(":digit:").ast[0]
-            ).build()
+            (be.class_(
+                be.ch("a"),
+                be.ptrn("digit", type=ast.PatternChar.Posix)
+            ),)
         )
 
     def test_char_classes_with_square_bracket(self):
         self._test_parse(
             "[\\]\\[]",
-            Expect().chcls("]", "[").build()
+            (be.class_(
+                be.ptrn("]"),
+                be.ptrn("[")
+            ),)
         )
 
     def test_char_classes_with_caret_and_dollar(self):
         self._test_parse(
             "[$^]",
-            Expect().chcls("$", "^").build()
+            (be.class_(
+                be.ch("$"),
+                be.ch("^")
+            ),)
         )
 
     def test_char_class_with_hypen(self):
         self._test_parse(
             "[a-b-]",
-            Expect().chcls(
-                Expect().raw_rng("a", "b").ast[0],
-                Expect().seq("-").ast[0],
-                dont_sequence=True
-            ).build()
+            (be.class_(
+                be.rang("a", "b"),
+                be.ch("-")
+            ),)
         )
 
     def test_not_a_range(self):
         self._test_parse(
             "a-b",
-            Expect().seq("a", "-", "b").build()
+            (be.ch("a"), be.ch("-"), be.ch("b"))
         )
 
     def test_group_with_alt_not_captured(self):
         self._test_parse(
             "(?:a|\\?:b)",
-            Expect().raw_alt(
-                Expect().seq("a").ast[0],
-                Expect().seq("?", ":", "b").ast
-            ).close_group(ignored=True)
-            .build()
+            (be.grp(
+                be.alt(
+                    (be.ch("a"),),
+                    (be.ch("?"), be.ch(":"), be.ch("b"))
+                ),
+                ign=True
+            ),)
         )
 
 
