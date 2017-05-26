@@ -370,8 +370,8 @@ class TestOfCommonTrap(AstTester):
         self._test_parse(
             "[\\]\\[]",
             (be.class_(
-                be.ptrn("]"),
-                be.ptrn("[")
+                be.ch("]"),
+                be.ch("[")
             ),)
         )
 
