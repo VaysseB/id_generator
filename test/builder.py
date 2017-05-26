@@ -72,29 +72,33 @@ class Expect:
         self.ast.append(t)
         return self
 
-    def q_maybe(self):
-        self.ast[-1].quantifier = ast.none_or_once
+    def q_maybe(self, greedy=True):
+        q = ast.NoneOrOnce()
+        q.greedy = greedy
+        self.ast[-1].quantifier = q
         return self
 
-    def q_0n(self):
-        self.ast[-1].quantifier = ast.none_or_more
+    def q_0n(self, greedy=True):
+        q = ast.NoneOrMore()
+        q.greedy = greedy
+        self.ast[-1].quantifier = q
         return self
 
     def q_1(self):
-        self.ast[-1].quantifier = ast.one_time
+        self.ast[-1].quantifier = ast.OneTime()
         return self
 
     def q_1n(self, greedy=True):
-        if greedy:
-            self.ast[-1].quantifier = ast.one_or_more
-        else:
-            self.ast[-1].quantifier = ast.one_or_more_ungreedy
+        q = ast.OneOrMore()
+        q.greedy = greedy
+        self.ast[-1].quantifier = q
         return self
 
-    def q_rng(self, min_, max_):
+    def q_rng(self, min_, max_, greedy=True):
         r = ast.Between()
         r.min = min_
         r.max = max_
+        r.greedy = greedy
         self.ast[-1].quantifier = r
         return self
 

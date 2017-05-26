@@ -13,7 +13,7 @@ class Group:
         self.ignored = False
         self.name = None
         self.lookhead = None
-        self.quantifier = one_time
+        self.quantifier = OneTime()
 
 
 class MatchBegin:
@@ -47,7 +47,7 @@ class SingleChar:
 
     def __init__(self):
         self.char = None
-        self.quantifier = one_time
+        self.quantifier = OneTime()
 
 
 class PatternChar:
@@ -67,7 +67,7 @@ class PatternChar:
     def __init__(self):
         self.pattern = ""
         self.type = None
-        self.quantifier = one_time
+        self.quantifier = OneTime()
 
 
 class Range:
@@ -89,7 +89,7 @@ class CharClass:
     def __init__(self):
         self.elems = ()
         self.negate = False
-        self.quantifier = one_time
+        self.quantifier = OneTime()
 
 
 #-----------------------------------------------------------------------------
@@ -97,13 +97,15 @@ class NoneOrOnce:
     """
     Example: .?
     """
-    pass
+    def __init__(self):
+        self.greedy = True
 
 class NoneOrMore:
     """
     Example: .*
     """
-    pass
+    def __init__(self):
+        self.greedy = True
 
 class OneTime:
     """
@@ -115,7 +117,8 @@ class OneOrMore:
     """
     Example: .+
     """
-    pass
+    def __init__(self):
+        self.greedy = True
 
 class Between:
     """
@@ -124,13 +127,7 @@ class Between:
     def __init__(self):
         self.min = None
         self.max = None
-
-none_or_once = NoneOrOnce()
-none_or_more = NoneOrMore()
-one_time = OneTime()
-one_or_more = OneOrMore()
-one_or_more_ungreedy = OneOrMore()
-
+        self.greedy = True
 
 #-----------------------------------------------------------------------------
 class AstFormatter:
@@ -168,14 +165,25 @@ class AstFormatter:
             return "|  " * (depth - 1) + "|-- "
 
     def _inline(self, depth, *args):
-        return self._ident(depth) + "".join(str(x) for x in args)
+        return self._ident(depth) + self._raw(*args)
+
+    def _raw(self, *args):
+        return "".join(str(x) for x in args)
+
+    def _format_quantifier(self, quantifier):
+        if quantifier:
+            text = "".join(self._format(quantifier))
+            return ("  [" + text + "]") if text else ""
+        return ""
 
     def _format_Group(self, group: Group, depth: int):
         name = (" \"" + group.name + "\"") if group.name is not None else ""
         if depth <= 0:
-            yield self._inline(depth, "root", name)
+            yield self._inline(depth, "root", name,
+                               self._format_quantifier(group.quantifier))
         else:
-            yield self._inline(depth, "group", name)
+            yield self._inline(depth, "group", name,
+                               self._format_quantifier(group.quantifier))
         for elem in group.seq:
             yield from self._format(elem, depth+1)
 
@@ -191,49 +199,60 @@ class AstFormatter:
             yield from self._format(elem, depth+1)
 
     def _format_SingleChar(self, sch: SingleChar, depth: int):
-        yield self._inline(depth, "char: ", sch.char)
+        yield self._inline(depth, "char: ", sch.char,
+                               self._format_quantifier(sch.quantifier))
 
     def _format_PatternChar(self, pch: PatternChar, depth: int):
         if pch.type == PatternChar.Posix:
-            yield self._inline(depth, "pattern: [posix] ", pch.pattern)
+            yield self._inline(depth, "pattern: [posix] ", pch.pattern,
+                               self._format_quantifier(pch.quantifier))
         elif pch.type == PatternChar.Unicode:
-            yield self._inline(depth, "pattern: [unicode] ", pch.pattern)
+            yield self._inline(depth, "pattern: [unicode] ", pch.pattern,
+                               self._format_quantifier(pch.quantifier))
         elif pch.type == PatternChar.Ascii:
-            yield self._inline(depth, "pattern: [ascii] ", pch.pattern)
+            yield self._inline(depth, "pattern: [ascii] ", pch.pattern,
+                               self._format_quantifier(pch.quantifier))
         else:
-            yield self._inline(depth, "pattern: ", pch.pattern)
+            yield self._inline(depth, "pattern: ", pch.pattern,
+                               self._format_quantifier(pch.quantifier))
 
     def _format_Range(self, rng: Range, depth: int):
-        yield self._inline(depth,
-                           "range: ",
-                           *self._format(rng.begin),
-                           " to ",
-                           *self._format(rng.end))
+        yield self._raw("range: ",
+                        *self._format(rng.begin),
+                        " to ",
+                        *self._format(rng.end))
 
     def _format_CharClass(self, chcls: CharClass, depth: int):
-        yield self._inline(depth, "class", " negated" * chcls.negate)
+        yield self._inline(depth, "class", " negated" * chcls.negate,
+                               self._format_quantifier(chcls.quantifier))
         for elem in chcls.elems:
             yield from self._format(elem, depth+1)
 
-    def _format_NoneOrOnce(self, _: NoneOrOnce, depth: int):
-        yield self._inline(depth, "0 or 1 time")
+    def _format_NoneOrOnce(self, q: NoneOrOnce, depth: int):
+        yield self._raw("0 or 1 time",
+                       (", not greedy" if not q.greedy else ""))
 
-    def _format_NoneOrMore(self, _: NoneOrMore, depth: int):
-        yield self._inline(depth, "0 or more")
+    def _format_NoneOrMore(self, q: NoneOrMore, depth: int):
+        yield self._raw("0 or more",
+                       (", not greedy" if not q.greedy else ""))
 
     def _format_OneTime(self, _: OneTime, depth: int):
-        yield self._inline(depth, "1 time")
+        yield ""
 
-    def _format_OneOrMore(self, _: OneOrMore, depth: int):
-        yield self._inline(depth, "1 or more")
+    def _format_OneOrMore(self, q: OneOrMore, depth: int):
+        yield self._raw("1 or more",
+                       (", not greedy" if not q.greedy else ""))
 
     def _format_Between(self, rpt: Between, depth: int):
         if rpt.min is None:
-            yield self._inline(depth, "up to ", rpt.max, " times")
+            yield self._raw("up to ", rpt.max, " times",
+                       (", not greedy" if not rpt.greedy else ""))
         elif rpt.max is None:
-            yield self._inline(depth, "at least ", rpt.max, " times")
+            yield self._raw("at least ", rpt.max, " times",
+                       (", not greedy" if not rpt.greedy else ""))
         else:
-            yield self._inline(depth, "between ", rpt.min, " and ", rpt.max)
+            yield self._raw("between ", rpt.min, " and ", rpt.max,
+                       (", not greedy" if not rpt.greedy else ""))
 
 
 ast_format = AstFormatter()

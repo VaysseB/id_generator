@@ -94,15 +94,23 @@ class ContentOfGroup:
                  + SpecialPattern.range_chars
                  + SpecialPattern.special_chars)
 
+    NotQuantified = 0
+    Quantified = 1
+    UngreedyQuantified = 2
+
     def __init__(self, group: OpeningOfGroup, initial: bool=False):
         self.group = group
         self.is_initial = initial
         self.prev = group if initial else self
+        self.quantified = ContentOfGroup.NotQuantified # true if last consumed char was a quantifier
 
     def add(self, other):
         self.group.add(other)
 
     def next(self, psm: PSM):
+        quantified = self.quantified
+        self.quantified = ContentOfGroup.NotQuantified
+
         if psm.char == ")":
             if self.is_initial:
                 psm.error = "unbalanced parenthesis"
@@ -132,11 +140,118 @@ class ContentOfGroup:
             r = CharClass(prev=self.prev)
             return r
 
+        # >>> Quantifiers
+        elif psm.char == "?" and quantified == ContentOfGroup.NotQuantified:
+            self.quantified = ContentOfGroup.Quantified
+            last = self._last_or_fail(psm)
+            if last:
+                last.quantifier = ast.NoneOrOnce()
+            return self.prev
+
+        elif psm.char == "*" and quantified == ContentOfGroup.NotQuantified:
+            self.quantified = ContentOfGroup.Quantified
+            last = self._last_or_fail(psm)
+            if last:
+                last.quantifier = ast.NoneOrMore()
+            return self.prev
+
+        elif psm.char == "+" and quantified == ContentOfGroup.NotQuantified:
+            self.quantified = ContentOfGroup.Quantified
+            last = self._last_or_fail(psm)
+            if last:
+                last.quantifier = ast.OneOrMore()
+            return self.prev
+
+        elif psm.char == "{" and quantified == ContentOfGroup.NotQuantified:
+            self.quantified = ContentOfGroup.Quantified
+            r = MinimumOfRepetition(prev=self.prev)
+            last = self._last_or_fail(psm)
+            if last:
+                last.quantifier = r.ast
+            return r
+
+        elif psm.char == "?" and quantified == ContentOfGroup.Quantified:
+            self.quantified = ContentOfGroup.UngreedyQuantified
+            last = self._last_or_fail(psm)
+            if last:
+                last.quantifier.greedy = False
+            return self.prev
+
+        elif quantified == ContentOfGroup.Quantified:
+            psm.error = "unexpected quantifier"
+
+        elif quantified == ContentOfGroup.UngreedyQuantified:
+            psm.error = "quantifier repeated"
+        # <<< Quantifier
+
         else:
             c = ast.SingleChar()
             c.char = psm.char
             self.group.add(c)
             return self.prev
+
+    def _last_or_fail(self, psm: PSM):
+        if self.group.ast.seq:
+            return self.group.ast.seq[-1]
+        else:
+            psm.error = "nothing to repeat"
+
+
+class MinimumOfRepetition:
+    def __init__(self, prev: ContentOfGroup):
+        self.prev = prev
+        self.ast = ast.Between()
+        self.min = []
+
+    def next(self, psm: PSM):
+        if psm.char.isdigit():
+            self.min.append(psm.char)
+            return self
+        elif psm.char == ",":
+            self._interpret()
+            return MaximumOfRepetition(prev=self.prev, ast=self.ast)
+        elif psm.char == "}":
+            self._interpret()
+            return self.prev
+        else:
+            psm.error = 'expected digit, "," or "}"'
+
+    def _interpret(self):
+        if not self.min:
+            return
+
+        try:
+            count = int("".join(self.min))
+        except ValueError:
+            assert False, "internal error: cannot convert to number"
+        self.ast.min = count
+
+
+class MaximumOfRepetition:
+    def __init__(self, prev: ContentOfGroup, ast: ast.Between):
+        self.prev = prev
+        self.ast = ast
+        self.max = []
+
+    def next(self, psm: PSM):
+        if psm.char.isdigit():
+            self.max.append(psm.char)
+            return self
+        elif psm.char == "}":
+            self._interpret()
+            return self.prev
+        else:
+            psm.error = 'expected digit, "," or "}"'
+
+    def _interpret(self):
+        if not self.max:
+            return
+
+        try:
+            count = int("".join(self.max))
+        except ValueError:
+            assert False, "internal error: cannot convert to number"
+        self.ast.max = count
 
 
 #--------------------------------------
