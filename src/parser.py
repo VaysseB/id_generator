@@ -10,14 +10,18 @@ from state_machine import PSM, Source
 class SpecialPattern:
     individual_chars = ('t', 'n', 'v', 'f', 'r', '0')
     range_chars = ('d', 'D', 'w', 'W', 's', 'S')
+
     special_chars = ('^', '$', '[', ']', '(', ')', '{', '}', '\\', '.', '*',
-                     '?', '+', '|')
+                     '?', '+', '|', '.')
     restrict_special_chars = ('\\', '[', ']')
+
     posix_classes = ("alnum", "alpha", "blank", "cntrl", "digit", "graph",
                      "lower", "print", "punct", "space", "upper", "xdigit",
                      "d", "w", "s")
     min_len_posix_class = 1
 
+
+# TODO rename some of 'prev' by 'parent' when a parent relationship exists
 
 #-------------------------------------
 # Group
@@ -124,6 +128,12 @@ class ContentOfGroup:
 
         elif psm.char == "$":
             self.group.add(ast.MatchEnd())
+            return self.prev
+
+        elif psm.char == ".":
+            t = ast.PatternChar()
+            t.pattern = psm.char
+            self.group.add(t)
             return self.prev
 
         elif psm.char == "\\":
@@ -251,56 +261,62 @@ class MaximumOfRepetition:
 
 #--------------------------------------
 class EscapedChar:
-    def __init__(self, prev, as_single_chars):
+    def __init__(self, prev, as_single_chars=(), as_pattern_chars=()):
         self.prev = prev  # ContentOfGroup or CharClass
-        self.ast = ast.PatternChar()
         self.single_chars = as_single_chars
+        self.pattern_chars = as_pattern_chars
 
     def next(self, psm: PSM):
         if psm.char in SpecialPattern.individual_chars \
-           or psm.char in SpecialPattern.range_chars:
-            self.ast.pattern = psm.char
-            self.prev.add(self.ast)
-            return self
+           or psm.char in SpecialPattern.range_chars \
+           or psm.char in self.pattern_chars:
+            t = ast.PatternChar()
+            t.pattern = psm.char
+            self.prev.add(t)
+            return self.prev
         elif psm.char in self.single_chars:
-            self.ast = ast.SingleChar()
-            self.ast.char = psm.char
-            self.prev.add(self.ast)
+            t = ast.SingleChar()
+            t.char = psm.char
+            self.prev.add(t)
             return self.prev
         elif psm.char == "x":
-            self.prev.add(self.ast)
-            return AsciiChar(self)
+            return AsciiChar(self.prev)
         elif psm.char == "u":
-            self.prev.add(self.ast)
-            return UnicodeChar(self)
+            return UnicodeChar(self.prev)
         else:
             psm.error = "unauthorized escape of {}".format(psm.char)
 
 
 class AsciiChar:
-    def __init__(self, ech: EscapedChar):
-        self.ech = ech
-        self.ech.ast.type = ast.PatternChar.Ascii
+    def __init__(self, prev):
+        self.prev = prev  # ContentOfGroup or CharClass
+        self.ast = ast.PatternChar()
+        self.ast.type = ast.PatternChar.Ascii
+
+        self.prev.add(self.ast)
 
     def next(self, psm: PSM):
         if psm.char in string.hexdigits:
-            self.ech.ast.pattern += psm.char
-            count = len(self.ech.ast.pattern)
-            return self.ech.prev if count >= 2 else self
+            self.ast.pattern += psm.char
+            count = len(self.ast.pattern)
+            return self.prev if count >= 2 else self
         else:
             psm.error = "expected ASCII letter or digit"
 
 
 class UnicodeChar:
-    def __init__(self, ech: EscapedChar):
-        self.ech = ech
-        self.ech.ast.type = ast.PatternChar.Unicode
+    def __init__(self, prev):
+        self.prev = prev  # ContentOfGroup or CharClass
+        self.ast = ast.PatternChar()
+        self.ast.type = ast.PatternChar.Unicode
+
+        self.prev.add(self.ast)
 
     def next(self, psm: PSM):
         if psm.char in string.hexdigits:
-            self.ech.ast.pattern += psm.char
-            count = len(self.ech.ast.pattern)
-            return self.ech.prev if count >= 4 else self
+            self.ast.pattern += psm.char
+            count = len(self.ast.pattern)
+            return self.prev if count >= 4 else self
         else:
             psm.error = "expected ASCII letter or digit"
 
