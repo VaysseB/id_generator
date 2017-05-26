@@ -90,10 +90,6 @@ class NameOfGroup:
 
 
 class ContentOfGroup:
-    all_chars = (SpecialPattern.individual_chars
-                 + SpecialPattern.range_chars
-                 + SpecialPattern.special_chars)
-
     NotQuantified = 0
     Quantified = 1
     UngreedyQuantified = 2
@@ -132,8 +128,7 @@ class ContentOfGroup:
 
         elif psm.char == "\\":
             g = EscapedChar(prev=self.prev,
-                            escapables_chars=ContentOfGroup.all_chars)
-            self.group.add_ast(g)
+                            as_single_chars=SpecialPattern.special_chars)
             return g
 
         elif psm.char == "[":
@@ -256,18 +251,27 @@ class MaximumOfRepetition:
 
 #--------------------------------------
 class EscapedChar:
-    def __init__(self, prev, escapables_chars):
-        self.prev = prev
+    def __init__(self, prev, as_single_chars):
+        self.prev = prev  # ContentOfGroup or CharClass
         self.ast = ast.PatternChar()
-        self.escapables_chars = escapables_chars
+        self.single_chars = as_single_chars
 
     def next(self, psm: PSM):
-        if psm.char in self.escapables_chars:
+        if psm.char in SpecialPattern.individual_chars \
+           or psm.char in SpecialPattern.range_chars:
             self.ast.pattern = psm.char
+            self.prev.add(self.ast)
+            return self
+        elif psm.char in self.single_chars:
+            self.ast = ast.SingleChar()
+            self.ast.char = psm.char
+            self.prev.add(self.ast)
             return self.prev
         elif psm.char == "x":
+            self.prev.add(self.ast)
             return AsciiChar(self)
         elif psm.char == "u":
+            self.prev.add(self.ast)
             return UnicodeChar(self)
         else:
             psm.error = "unauthorized escape of {}".format(psm.char)
@@ -303,10 +307,6 @@ class UnicodeChar:
 
 #-------------------------------------
 class CharClass:
-    all_chars = (SpecialPattern.individual_chars
-                 + SpecialPattern.range_chars
-                 + SpecialPattern.restrict_special_chars)
-
     def __init__(self, prev):
         self.prev = prev # ContentOfGroup or CharClass
         self.ast = ast.CharClass()
@@ -326,8 +326,7 @@ class CharClass:
             self.next_is_range = this_should_be_range
 
             s = EscapedChar(prev=self,
-                            escapables_chars=CharClass.all_chars)
-            self.add(s.ast)
+                            as_single_chars=SpecialPattern.restrict_special_chars)
             return s
 
         elif this_should_be_range and psm.char != "]":

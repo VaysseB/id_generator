@@ -70,7 +70,7 @@ def rang_ch(begin, end) -> ast.Range:
 
 def ptrn(c: str, type=None, quant=1) -> ast.PatternChar:
     assert isinstance(c, str), "character of PatternChar must be str"
-    t = ast.SingleChar()
+    t = ast.PatternChar()
     t.pattern = c
     t.quantifier = _make_quantifier(quant)
     if type is not None:
@@ -84,7 +84,7 @@ def grp(*items, name=None, ign=None, lkhead=None, quant=1) -> ast.Group:
     t.quantifier = _make_quantifier(quant)
     t.ignored = t.ignored if ign is None else ign
     t.name = t.name if name is None else name
-    t.lookhead = t.lookhead if lkhead else lkhead
+    t.lookhead = t.lookhead if lkhead is None else lkhead
     return t
 
 
