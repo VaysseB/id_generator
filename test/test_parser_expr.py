@@ -8,10 +8,9 @@ import ast
 import parser
 
 
-class TestExpressionParser(unittest.TestCase):
-
+class AstTester(unittest.TestCase):
     def __init__(self, *args, **kw):
-        super(TestExpressionParser, self).__init__(*args, **kw)
+        super(AstTester, self).__init__(*args, **kw)
         self._asserters = {
             ast.Group        : self._assertAst_Group,
             ast.MatchBegin   : self._assertAst_MatchBegin,
@@ -66,8 +65,8 @@ class TestExpressionParser(unittest.TestCase):
         pass
 
     def _assertAst_Range(self, range_: ast.Range, expected: ast.Range):
-        self.assertEqual(range_.begin, expected.begin)
-        self.assertEqual(range_.end, expected.end)
+        self.assertAstEqual(range_.begin, expected.begin)
+        self.assertAstEqual(range_.end, expected.end)
 
     def _assertAst_CharClass(self, charclass: ast.CharClass,
                              expected: ast.CharClass):
@@ -98,8 +97,12 @@ class TestExpressionParser(unittest.TestCase):
         result = parser.parse(input_expr)
         self.assertAstEqual(result, expected_ast)
 
+
 #-----------------------------------------------------------------------------
 # Nominal cases
+class TestBaseOfExpression(AstTester):
+    def __init__(self, *args, **kw):
+        super(TestBaseOfExpression, self).__init__(*args, **kw)
 
     def test_parse_sequence(self):
         self._test_parse(
@@ -261,7 +264,7 @@ class TestExpressionParser(unittest.TestCase):
     def test_parse_alt(self):
         self._test_parse(
             "a|b",
-            Expect().alt(
+            Expect().raw_alt(
                 Expect().seq("a").ast[0],
                 Expect().seq("b").ast[0]
             ).build()
@@ -315,8 +318,13 @@ class TestExpressionParser(unittest.TestCase):
             Expect().seq("a").q_1n(greedy=False).build()
         )
 
+
 #-----------------------------------------------------------------------------
 # Edge case
+class TestOfCommonTrap(AstTester):
+    def __init__(self, *args, **kw):
+        super(TestOfCommonTrap, self).__init__(*args, **kw)
+
     def test_char_classes_with_posix_at_begin(self):
         self._test_parse(
             "[[:digit:]a]",
@@ -338,13 +346,13 @@ class TestExpressionParser(unittest.TestCase):
     def test_char_classes_with_square_bracket(self):
         self._test_parse(
             "[\\]\\[]",
-            Expect().chcls("][").build()
+            Expect().chcls("]", "[").build()
         )
 
     def test_char_classes_with_caret_and_dollar(self):
         self._test_parse(
-            "[\\^$]",
-            Expect().chcls("^", "$").build()
+            "[$^]",
+            Expect().chcls("$", "^").build()
         )
 
     def test_char_class_with_hypen(self):
@@ -352,7 +360,8 @@ class TestExpressionParser(unittest.TestCase):
             "[a-b-]",
             Expect().chcls(
                 Expect().raw_rng("a", "b").ast[0],
-                Expect().seq("-").ast[0]
+                Expect().seq("-").ast[0],
+                dont_sequence=True
             ).build()
         )
 
@@ -365,7 +374,7 @@ class TestExpressionParser(unittest.TestCase):
     def test_group_with_alt_not_captured(self):
         self._test_parse(
             "(?:a|\\?:b)",
-            Expect().alt(
+            Expect().raw_alt(
                 Expect().seq("a").ast[0],
                 Expect().seq("?", ":", "b").ast
             ).close_group(ignored=True)

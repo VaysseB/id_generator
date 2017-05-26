@@ -16,41 +16,31 @@ class Expect:
 
     def chcls(self, *elems, **kw):
         s = ast.CharClass()
-        s.elems = tuple(iter(elems))
+        if kw.get("dont_sequence", False):
+            s.elems = tuple(elems)
+        else:
+            s.elems = tuple(Expect().seq(*elems).ast)
         s.__dict__.update(kw)
         self.ast.append(s)
         return self
 
     def raw_rng(self, begin, end):
         s = ast.Range()
-        s.begin = begin
-        s.end = end
-        self.ast = [s]
+        s.begin = ast.SingleChar()
+        s.begin.char = begin
+        s.end = ast.SingleChar()
+        s.end.char = end
+        self.ast.append(s)
         return self
 
     def chrng(self, begin, end, **kw):
-        s = ast.Range()
-        s.begin = begin
-        s.end = end
-
         c = ast.CharClass()
-        c.elems = (s,)
+        c.elems = (Expect().raw_rng(begin, end).ast[0],)
         c.__dict__.update(kw)
-
         self.ast.append(c)
         return self
 
-    def numrng(self, begin, end, **kw):
-        s = ast.Range()
-        s.begin = begin
-        s.end = end
-
-        c = ast.CharClass()
-        c.elems = (s,)
-        c.__dict__.update(kw)
-
-        self.ast.append(c)
-        return self
+    numrng = chrng
 
     def pattch(self, text, **kw):
         s = ast.PatternChar()
@@ -76,7 +66,7 @@ class Expect:
         self.ast.append(t)
         return self
 
-    def alt(self, *parts):
+    def raw_alt(self, *parts):
         t = ast.Alternative()
         t.elems = tuple(parts)
         self.ast.append(t)
