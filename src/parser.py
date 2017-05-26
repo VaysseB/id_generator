@@ -12,6 +12,7 @@ class SpecialPattern:
     range_chars = ('d', 'D', 'w', 'W', 's', 'S')
     special_chars = ('^', '$', '[', ']', '(', ')', '{', '}', '\\', '.', '*',
                      '?', '+', '|')
+    restrict_special_chars = ('\\', '[', ']')
     posix_classes = ("alnum", "alpha", "blank", "cntrl", "digit", "graph",
                      "lower", "print", "punct", "space", "upper", "xdigit",
                      "d", "w", "s")
@@ -89,6 +90,10 @@ class NameOfGroup:
 
 
 class ContentOfGroup:
+    all_chars = (SpecialPattern.individual_chars
+                 + SpecialPattern.range_chars
+                 + SpecialPattern.special_chars)
+
     def __init__(self, group: OpeningOfGroup, initial: bool=False):
         self.group = group
         self.is_initial = initial
@@ -98,7 +103,6 @@ class ContentOfGroup:
         self.group.add(other)
 
     def next(self, psm: PSM):
-
         if psm.char == ")":
             if self.is_initial:
                 psm.error = "unbalanced parenthesis"
@@ -119,15 +123,14 @@ class ContentOfGroup:
             return self.prev
 
         elif psm.char == "\\":
-            g = EscapedChar(prev=self.prev)
+            g = EscapedChar(prev=self.prev,
+                            escapables_chars=ContentOfGroup.all_chars)
             self.group.add_ast(g)
             return g
 
         elif psm.char == "[":
             r = CharClass(prev=self.prev)
             return r
-
-# TODO insert here other cases
 
         else:
             c = ast.SingleChar()
@@ -138,15 +141,13 @@ class ContentOfGroup:
 
 #--------------------------------------
 class EscapedChar:
-
-    def __init__(self, prev):
+    def __init__(self, prev, escapables_chars):
         self.prev = prev
         self.ast = ast.PatternChar()
+        self.escapables_chars = escapables_chars
 
     def next(self, psm: PSM):
-        if psm.char in SpecialPattern.individual_chars \
-           or psm.char in SpecialPattern.range_chars \
-           or psm.char in SpecialPattern.special_chars:
+        if psm.char in self.escapables_chars:
             self.ast.pattern = psm.char
             return self.prev
         elif psm.char == "x":
@@ -170,6 +171,7 @@ class AsciiChar:
         else:
             psm.error = "expected ASCII letter or digit"
 
+
 class UnicodeChar:
     def __init__(self, ech: EscapedChar):
         self.ech = ech
@@ -186,14 +188,23 @@ class UnicodeChar:
 
 #-------------------------------------
 class CharClass:
+    all_chars = (SpecialPattern.individual_chars
+                 + SpecialPattern.range_chars
+                 + SpecialPattern.restrict_special_chars)
+
     def __init__(self, prev):
         self.prev = prev # ContentOfGroup or CharClass
         self.ast = ast.CharClass()
         self.next_is_range = False
+        self.empty = True
+        self.can_mutate = True
 
     def next(self, psm: PSM):
         this_should_be_range = self.next_is_range
         self.next_is_range = False
+
+        this_is_empty = self.empty
+        self.empty = False
 
         if this_should_be_range and psm.char != "]":
             self.next_is_range = False
@@ -205,14 +216,22 @@ class CharClass:
             return self
 
         elif psm.char == "\\":
-            s = EscapedChar(prev=self)
+            self.can_mutate = False
+
+            s = EscapedChar(prev=self,
+                            escapables_chars=CharClass.all_chars)
             self.add(s.ast)
             return s
 
         elif psm.char == "^":
-            if not self.empty:
-                psm.error = 'caret "^" must be escaped or at the begining'
-            self.ast.negate = True
+            # if at the begining, it has a special meaning
+            if this_is_empty:
+                self.can_mutate = False
+                self.ast.negate = True
+            else:
+                s = ast.SingleChar()
+                s.char = psm.char
+                self.add(s)
             return self
 
         elif psm.char == "]":
@@ -240,11 +259,6 @@ class CharClass:
             self.add(s)
             return self
 
-
-    @property
-    def empty(self):
-        return not self.ast.elems
-
     def add(self, other):
         self.ast.elems = self.ast.elems + (other,)
 
@@ -261,8 +275,7 @@ class CharClass:
         # because mutation is only possible if the exact string of the content
         # match a pre-definied list, so if an unlogged char is consumed, it
         # must prevent mutation
-        can_mutate = self.ast.negate is False
-        if not can_mutate:
+        if not self.can_mutate:
             return
 
         if len(self.ast.elems) < SpecialPattern.min_len_posix_class + 2:
