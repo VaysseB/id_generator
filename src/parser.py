@@ -321,7 +321,7 @@ class AsciiChar:
         self.pattern = ast.PatternChar()
         self.pattern.type = ast.PatternChar.Ascii
 
-        self.prev.add(self.ast)
+        self.prev.add(self.pattern)
 
     def next(self, psm: PSM):
         if psm.char in string.hexdigits:
@@ -329,14 +329,14 @@ class AsciiChar:
             count = len(self.pattern.pattern)
             return self.prev if count >= 2 else self
         else:
-            psm.error = "expected ASCII letter or digit"
+            psm.error = "expected ASCII hexadecimal character"
 
 
 class UnicodeChar:
     def __init__(self, prev):
         self.prev = prev  # ContentOfGroup or CharClass
-        self.pattern = pattern.PatternChar()
-        self.pattern.type = pattern.PatternChar.Unicode
+        self.pattern = ast.PatternChar()
+        self.pattern.type = ast.PatternChar.Unicode
 
         self.prev.add(self.pattern)
 
@@ -346,7 +346,7 @@ class UnicodeChar:
             count = len(self.pattern.pattern)
             return self.prev if count >= 4 else self
         else:
-            psm.error = "expected ASCII letter or digit"
+            psm.error = "expected ASCII hexadecimal character"
 
 
 #-------------------------------------

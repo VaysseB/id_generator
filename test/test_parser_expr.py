@@ -161,6 +161,28 @@ class TestBaseOfExpression(AstTester):
                 (be.ptrn(spc),)
             )
 
+    def test_parse_ascii_char(self):
+        ascii_chars = (
+            "12",
+            "AF"
+        )
+        for ach in ascii_chars:
+            self._test_parse(
+                "\\x" + ach,
+                (be.ptrn(ach, type=ast.PatternChar.Ascii),)
+            )
+
+    def test_parse_unicode_char(self):
+        unicode_chars = (
+            "138A",
+            "983F"
+        )
+        for ach in unicode_chars:
+            self._test_parse(
+                "\\u" + ach,
+                (be.ptrn(ach, type=ast.PatternChar.Unicode),)
+            )
+
     def test_parse_range_special_char(self):
         special_chars = (
             "d",
@@ -386,6 +408,14 @@ class TestOfCommonTrap(AstTester):
             (be.class_(
                 be.ch("$"),
                 be.ch("^")
+            ),)
+        )
+
+    def test_char_class_only_with_hypen(self):
+        self._test_parse(
+            "[-]",
+            (be.class_(
+                be.ch("-")
             ),)
         )
 
