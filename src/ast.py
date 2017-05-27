@@ -37,6 +37,7 @@ class Alternative:
     """
 
     def __init__(self):
+        # parts is a tuple of tuple
         self.parts = ()
 
 
@@ -202,8 +203,10 @@ class AstFormatter:
 
     def _format_Alternative(self, alt: Alternative,  depth: int):
         yield self._inline(depth, "alt")
-        for elem in alt.parts:
-            yield from self._format(elem, depth+1)
+        for (i, part) in enumerate(alt.parts):
+            yield self._inline(depth+1, "#" + str(i))
+            for elem in part:
+                yield from self._format(elem, depth+2)
 
     def _format_SingleChar(self, sch: SingleChar, depth: int):
         yield self._inline(depth, "char: ", sch.char,

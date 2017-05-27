@@ -98,6 +98,6 @@ def eol() -> ast.MatchEnd:
 
 def alt(*items) -> ast.Alternative:
     t = ast.Alternative()
-    t.elems = tuple(items)
+    t.parts = tuple(items)
     return t
 

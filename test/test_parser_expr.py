@@ -48,9 +48,14 @@ class AstTester(unittest.TestCase):
 
     def _assertAst_Alternative(self, alt: ast.Alternative,
                                expected: ast.Alternative):
-        for (elem, elem_expected) in itertools.zip_longest(alt.parts,
-                                                           expected.parts):
-            self.assertAstEqual(elem, elem_expected)
+        paired_parts = itertools.zip_longest(alt.parts, expected.parts)
+        for (part, part_expected) in paired_parts:
+            self.assertIsNotNone(part)
+            self.assertIsNotNone(part_expected)
+
+            paired_elems = itertools.zip_longest(part, part_expected)
+            for (elem, elem_expected) in paired_elems:
+                self.assertAstEqual(elem, elem_expected)
 
     def _assertAst_SingleChar(self, singlechar: ast.SingleChar,
                               expected: ast.SingleChar):

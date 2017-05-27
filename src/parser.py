@@ -30,7 +30,8 @@ class WrappedGroup:
 
     def add(self, other):
         if self.is_alt:
-            self.alt.parts = self.alt.parts + (other,)
+            last_alt = self.alt.parts[-1] + (other,)
+            self.alt.parts = self.alt.parts[:-1] + (last_alt,)
         else:
             self.group.seq = self.group.seq + (other,)
 
@@ -41,12 +42,12 @@ class WrappedGroup:
 
     def collapse_alt(self):
         if self.is_alt:
-            self.alt.parts = self.alt.parts + ()
+            self.alt.parts = self.alt.parts + ((),)
         else:
             self.is_alt = True
             first_alt_elems = self.group.seq
-            self.group.seq = ast.Alternative()
-            self.alt.parts = (first_alt_elems,)
+            self.group.seq = (ast.Alternative(),)
+            self.alt.parts = (first_alt_elems,())
 
 
 class OpeningOfGroup:
