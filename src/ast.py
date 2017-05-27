@@ -224,10 +224,11 @@ class AstFormatter:
                                self._format_quantifier(pch.quantifier))
 
     def _format_Range(self, rng: Range, depth: int):
-        yield self._raw("range: ",
-                        *self._format(rng.begin),
-                        " to ",
-                        *self._format(rng.end))
+        yield self._inline(depth,
+                           "range: ",
+                           *self._format(rng.begin),
+                           " to ",
+                           *self._format(rng.end))
 
     def _format_CharClass(self, chcls: CharClass, depth: int):
         yield self._inline(depth, "class", " negated" * chcls.negate,
