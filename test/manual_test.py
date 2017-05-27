@@ -42,9 +42,9 @@ if __name__ == "__main__":
         class DebugVisitor(object):
             def __getattr__(self, name):
                 keyword = "visit_"
-                ntype = name[len(keyword):]
                 if name.startswith(keyword):
+                    ntype = name[len(keyword):]
                     return lambda x,n=ntype: print("Visit " + n + ":", x)
-                return super(DebugVisitor, self).__getattribute__(name)
+                return super(DebugVisitor, self).__getattr__(name)
 
         ast.visit(expr_ast, DebugVisitor())

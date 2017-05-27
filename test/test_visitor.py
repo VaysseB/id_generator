@@ -21,6 +21,14 @@ class CounterVisitor:
         self.q_one_or_more = 0
         self.q_between = 0
 
+    @property
+    def sum_q(self):
+        return (self.q_none_or_once
+                + self.q_none_or_more
+                + self.q_one_time
+                + self.q_one_or_more
+                + self.q_between)
+
     def visit_Group(self, group):
         self.group += 1
 
@@ -74,7 +82,8 @@ class TestVisitor(unittest.TestCase):
             built_ast = be.grp(st)
             visitor = CounterVisitor()
             ast.visit(built_ast, visitor)
-            self.assertEqual(visitor.q_one_time, 1)
+            self.assertEqual(visitor.q_one_time, 2)
+            self.assertEqual(visitor.sum_q, 2)
 
 
 if __name__ == "__main__":

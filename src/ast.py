@@ -1,4 +1,7 @@
 
+import builtins
+_print = builtins.print
+
 
 class Group:
     """
@@ -151,9 +154,8 @@ class Formatter:
         }
 
     def print(self, ast):
-        import builtins
         for line in self._format(ast, depth=0):
-            builtins.print(line)
+            _print(line)
 
     def _format(self, ast, depth=0):
         yield from self.formatters[type(ast)](ast, depth)
@@ -274,6 +276,22 @@ def print(ast):
 
 #-----------------------------------------------------------------------------
 class Walker:
+    visitor_methods = (
+        "visit_Group",
+        "visit_MatchBegin",
+        "visit_MatchEnd",
+        "visit_Alternative",
+        "visit_SingleChar",
+        "visit_PatternChar",
+        "visit_Range",
+        "visit_CharClass",
+        "visit_NoneOrOnce",
+        "visit_NoneOrMore",
+        "visit_OneTime",
+        "visit_OneOrMore",
+        "visit_Between"
+    )
+
     def __init__(self):
         self.walkers = {
             Group       : self._walk_Group,
@@ -300,7 +318,7 @@ class Walker:
 
     def _visit(self, type_name, ast, visitor, quantify: bool=True):
         method_name = "visit_" + type_name
-        method = getattr(ast, method_name, None)
+        method = getattr(visitor, method_name, None)
         if callable(method):
             method(ast)
 
@@ -346,16 +364,16 @@ class Walker:
         self._visit("NoneOrOnce", q, visitor)
 
     def _walk_NoneOrMore(self, q: NoneOrMore, visitor, quantify: bool):
-        self._visit("NoneOrOnce", q, visitor)
+        self._visit("NoneOrMore", q, visitor)
 
     def _walk_OneTime(self, q: OneTime, visitor, quantify: bool):
-        self._visit("NoneOrOnce", q, visitor)
+        self._visit("OneTime", q, visitor)
 
     def _walk_OneOrMore(self, q: OneOrMore, visitor, quantify: bool):
-        self._visit("NoneOrOnce", q, visitor)
+        self._visit("OneOrMore", q, visitor)
 
     def _walk_Between(self, rpt: Between, visitor, quantify: bool):
-        self._visit("NoneOrOnce", rp, visitor)
+        self._visit("Between", rp, visitor)
 
 
 walker = Walker()
