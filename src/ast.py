@@ -130,8 +130,9 @@ class Between:
         self.max = None
         self.greedy = True
 
+
 #-----------------------------------------------------------------------------
-class AstFormatter:
+class Formatter:
     def __init__(self):
         self.formatters = {
             Group       : self._format_Group,
@@ -266,6 +267,98 @@ class AstFormatter:
                        (", not greedy" if not rpt.greedy else ""))
 
 
-ast_format = AstFormatter()
+ast_format = Formatter()
 def print(ast):
     ast_format.print(ast)
+
+
+#-----------------------------------------------------------------------------
+class Walker:
+    def __init__(self):
+        self.walkers = {
+            Group       : self._walk_Group,
+            MatchBegin  : self._walk_MatchBegin,
+            MatchEnd    : self._walk_MatchEnd,
+            Alternative : self._walk_Alternative,
+            SingleChar  : self._walk_SingleChar,
+            PatternChar : self._walk_PatternChar,
+            Range       : self._walk_Range,
+            CharClass   : self._walk_CharClass,
+            NoneOrOnce  : self._walk_NoneOrOnce,
+            NoneOrMore  : self._walk_NoneOrMore,
+            OneTime     : self._walk_OneTime,
+            OneOrMore   : self._walk_OneOrMore,
+            Between     : self._walk_Between
+        }
+
+    def walk(self, ast, visitor, quantify: bool=True):
+        if isinstance(ast, (list, tuple)):
+            for item in ast:
+                self.walkers[type(item)](item, visitor, quantify)
+        else:
+            self.walkers[type(ast)](ast, visitor, quantify)
+
+    def _visit(self, type_name, ast, visitor, quantify: bool=True):
+        method_name = "visit_" + type_name
+        method = getattr(ast, method_name, None)
+        if callable(method):
+            method(ast)
+
+    def _walk_Group(self, group: Group, visitor, quantify: bool):
+        self._visit("Group", group, visitor)
+        if quantify:
+            self.walk(group.quantifier, visitor)
+        self.walk(group.seq, visitor)
+
+    def _walk_MatchBegin(self, mb: MatchBegin, visitor, quantify: bool):
+        self._visit("MatchBegin", mb, visitor)
+
+    def _walk_MatchEnd(self, me: MatchEnd, visitor, quantify: bool):
+        self._visit("MatchEnd", me, visitor)
+
+    def _walk_Alternative(self, alt: Alternative, visitor, quantify: bool):
+        self._visit("Alternative", alt, visitor)
+        for part in alt.parts:
+            self.walk(part, visitor)
+
+    def _walk_SingleChar(self, sch: SingleChar, visitor, quantify: bool):
+        self._visit("SingleChar", sch, visitor)
+        if quantify:
+            self.walk(sch.quantifier, visitor)
+
+    def _walk_PatternChar(self, pch: PatternChar, visitor, quantify: bool):
+        self._visit("PatternChar", pch, visitor)
+        if quantify:
+            self.walk(pch.quantifier, visitor)
+
+    def _walk_Range(self, rng: Range, visitor, quantify: bool):
+        self._visit("Range", rng, visitor)
+        if quantify:
+            self.walk(rng.quantifier, visitor)
+
+    def _walk_CharClass(self, chcls: CharClass, visitor, quantify: bool):
+        self._visit("CharClass", chcls, visitor)
+        if quantify:
+            self.walk(chcls.quantifier, visitor)
+        self.walk(chcls.elems, visitor, False)
+
+    def _walk_NoneOrOnce(self, q: NoneOrOnce, visitor, quantify: bool):
+        self._visit("NoneOrOnce", q, visitor)
+
+    def _walk_NoneOrMore(self, q: NoneOrMore, visitor, quantify: bool):
+        self._visit("NoneOrOnce", q, visitor)
+
+    def _walk_OneTime(self, q: OneTime, visitor, quantify: bool):
+        self._visit("NoneOrOnce", q, visitor)
+
+    def _walk_OneOrMore(self, q: OneOrMore, visitor, quantify: bool):
+        self._visit("NoneOrOnce", q, visitor)
+
+    def _walk_Between(self, rpt: Between, visitor, quantify: bool):
+        self._visit("NoneOrOnce", rp, visitor)
+
+
+walker = Walker()
+def visit(ast, visitor):
+    walker.walk(ast, visitor)
+
