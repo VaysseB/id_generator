@@ -178,11 +178,18 @@ class AstFormatter:
 
     def _format_Group(self, group: Group, depth: int):
         name = (" \"" + group.name + "\"") if group.name is not None else ""
+        ignored = " (ignored)" if group.ignored else ""
+        lookhead = ("" if group.lookhead is None else
+                   (" lookhead:" + (
+                       "pos"
+                       if group.lookhead == Group.PositiveLookhead
+                       else "neg"
+                   )))
         if depth <= 0:
-            yield self._inline(depth, "root", name,
+            yield self._inline(depth, "root", name, ignored, lookhead,
                                self._format_quantifier(group.quantifier))
         else:
-            yield self._inline(depth, "group", name,
+            yield self._inline(depth, "group", name, ignored, lookhead,
                                self._format_quantifier(group.quantifier))
         for elem in group.seq:
             yield from self._format(elem, depth+1)
