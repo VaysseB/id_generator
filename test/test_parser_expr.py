@@ -221,6 +221,18 @@ class TestBaseOfExpression(AstTester):
                 (be.ch(ech),)
             )
 
+    def test_parse_escaped_char_in_class(self):
+        escaped_chars = (
+            "\\",
+            "[",
+            "]"
+        )
+        for ech in escaped_chars:
+            self._test_parse(
+                "[\\" + ech + "]",
+                (be.class_(be.ch(ech)),)
+            )
+
     def test_parse_dot_as_generic(self):
         self._test_parse(
             ".",
