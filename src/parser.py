@@ -196,7 +196,7 @@ class ContentOfGroup:
 
         elif psm.char == "{" and quantified == ContentOfGroup.NotQuantified:
             self.quantified = ContentOfGroup.Quantified
-            t = MinimumOfRepetition(self.limited_prev)
+            t = MinimumOfRepeatition(self.limited_prev)
             last = self._last_or_fail(psm)
             if last:
                 last.quantifier = t.between
@@ -208,12 +208,6 @@ class ContentOfGroup:
             if last:
                 last.quantifier.greedy = False
             return self.limited_prev
-
-        elif quantified == ContentOfGroup.Quantified:
-            psm.error = "unexpected quantifier"
-
-        elif quantified == ContentOfGroup.UngreedyQuantified:
-            psm.error = "quantifier repeated"
         # <<< Quantifier
 
         else:
@@ -229,7 +223,7 @@ class ContentOfGroup:
             psm.error = "nothing to repeat"
 
 
-class MinimumOfRepetition:
+class MinimumOfRepeatition:
     def __init__(self, parent: ContentOfGroup):
         self.parent = parent
         self.between = ast.Between()
@@ -241,7 +235,7 @@ class MinimumOfRepetition:
             return self
         elif psm.char == ",":
             self._interpret()
-            return MaximumOfRepetition(self)
+            return MaximumOfRepeatition(self)
         elif psm.char == "}":
             self._interpret()
             return self.parent
@@ -259,8 +253,8 @@ class MinimumOfRepetition:
         self.between.min = count
 
 
-class MaximumOfRepetition:
-    def __init__(self, repeat: MinimumOfRepetition):
+class MaximumOfRepeatition:
+    def __init__(self, repeat: MinimumOfRepeatition):
         self.repeat = repeat
         self.max = []
 
