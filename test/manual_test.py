@@ -17,11 +17,11 @@ def parse_args():
     return pargs.parse_args()
 
 
-def print_source(psm: sm.PSM):
+def print_source(psm: sm.StateMachine):
     print("Source:", psm.source.curr, "   State:", psm.state)
 
 
-def print_state_is_done(psm: sm.PSM):
+def print_state_is_done(psm: sm.StateMachine):
     if psm.source.done:
         print("Done with state:", psm.state)
 

@@ -1,5 +1,10 @@
 
 
+class ParseError(RuntimeError):
+    def __init__(self, *args, **kw):
+        super(ParseError, self).__init__(*args, **kw)
+
+
 class Source:
     """
     Source for parsing.
@@ -15,6 +20,7 @@ class Source:
     def next(self):
         try:
             self.curr = next(self.content)
+            self.pos += 1
             self.done = False
         except StopIteration:
             self.curr = None
@@ -22,9 +28,9 @@ class Source:
         return not self.done
 
 
-class PSM:
+class StateMachine:
     """
-    Parser State Machine.
+    State Machine.
     """
 
     def __init__(self):
@@ -32,6 +38,7 @@ class PSM:
         self.starting_state = None
         self.state = None
         self.error = None
+        self.error_exception = RuntimeError
 
         self.pre_action = None
         self.post_action = None
@@ -56,7 +63,10 @@ class PSM:
         next_state = self.state.next(self)
 
         if self.error:
-            raise RuntimeError("parse error: " + self.error)
+            error_msg = "error at pos {}: {}".format(self.source.pos,
+                                                     self.error)
+            error_exc = self.error_exception(error_msg)
+            raise error_exc
 
         assert next_state is not None, "internal error: cannot find next state"
         self.state = next_state
@@ -72,7 +82,8 @@ class PSM:
             if self.can_end:
                 return False
             else:
-                raise RuntimeError("parse error: unexpected end")
+                error_exc = self.error_exception("unexpected stop")
+                raise error_exc
 
         return True
 
@@ -89,7 +100,7 @@ class State:
         self.data = {}
         self.transitions = ()
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         return self.transitions[psm.char]
 
 # <<< end of example

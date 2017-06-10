@@ -2,7 +2,7 @@
 import string
 
 import ast
-from state_machine import PSM, Source
+from state_machine import StateMachine, Source, ParseError
 
 
 
@@ -11,8 +11,9 @@ class SpecialPattern:
     range_chars = ('d', 'D', 'w', 'W', 's', 'S')
 
     special_chars = ('^', '$', '[', ']', '(', ')', '{', '}', '\\', '.', '*',
-                     '?', '+', '|', '.')
+                     '?', '+', '|')
     restrict_special_chars = ('\\', '[', ']')
+    avoid_as_single_char = ("*", "?", "+")
 
     posix_classes = ("alnum", "alpha", "blank", "cntrl", "digit", "graph",
                      "lower", "print", "punct", "space", "upper", "xdigit",
@@ -68,7 +69,7 @@ class OpeningOfGroup:
         else:
             self.parent.add(self.g.group)
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         if not self.is_initial and psm.char == "?":
             return FirstOptionOfGroup(self)
         elif psm.char == ")":
@@ -89,7 +90,7 @@ class FirstOptionOfGroup:
     def __init__(self, parent: OpeningOfGroup):
         self.parent = parent
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         if psm.char == ":":
             self.parent.g.group.ignored = True
             return ContentOfGroup(self.parent)
@@ -110,7 +111,7 @@ class NameOfGroup:
     def __init__(self, parent: OpeningOfGroup):
         self.parent = parent
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         if psm.char.isalpha() or psm.char == "_":
             self.parent.g.group.name += psm.char
             return self
@@ -134,7 +135,7 @@ class ContentOfGroup:
         # forward of function
         self.add = self.parent.add
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         quantified = self.quantified
         self.quantified = ContentOfGroup.NotQuantified
 
@@ -210,13 +211,16 @@ class ContentOfGroup:
             return self.limited_prev
         # <<< Quantifier
 
+        elif psm.char in SpecialPattern.avoid_as_single_char:
+            psm.error = "incorrect use or unescaped '{}'".format(psm.char)
+
         else:
             t = ast.SingleChar()
             t.char = psm.char
             self.add(t)
             return self.limited_prev
 
-    def _last_or_fail(self, psm: PSM):
+    def _last_or_fail(self, psm: StateMachine):
         if self.parent.g.group.seq:
             return self.parent.g.group.seq[-1]
         else:
@@ -229,7 +233,7 @@ class MinimumOfRepeatition:
         self.between = ast.Between()
         self.min = []
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         if psm.char.isdigit():
             self.min.append(psm.char)
             return self
@@ -258,7 +262,7 @@ class MaximumOfRepeatition:
         self.repeat = repeat
         self.max = []
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         if psm.char.isdigit():
             self.max.append(psm.char)
             return self
@@ -288,7 +292,7 @@ class EscapedChar:
         self.single_chars = as_single_chars
         self.pattern_chars = as_pattern_chars
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         if psm.char in SpecialPattern.individual_chars \
            or psm.char in SpecialPattern.range_chars \
            or psm.char in self.pattern_chars:
@@ -317,7 +321,7 @@ class AsciiChar:
 
         self.prev.add(self.pattern)
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         if psm.char in string.hexdigits:
             self.pattern.pattern += psm.char
             count = len(self.pattern.pattern)
@@ -334,7 +338,7 @@ class UnicodeChar:
 
         self.prev.add(self.pattern)
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         if psm.char in string.hexdigits:
             self.pattern.pattern += psm.char
             count = len(self.pattern.pattern)
@@ -374,7 +378,7 @@ class CharClass:
         self.empty = True
         self.can_mutate = True
 
-    def next(self, psm: PSM):
+    def next(self, psm: StateMachine):
         this_should_be_range = self.next_is_range
         self.next_is_range = False
 
@@ -480,7 +484,8 @@ class CharClass:
 
 #-------------------------------------
 def parse(expr, **kw):
-    sm = PSM()
+    sm = StateMachine()
+    sm.error_exception = ParseError
     sm.source = Source(expr)
     sm.starts_with(OpeningOfGroup(parent=None, initial=True))
     sm.pre_action = kw.get("pre_action", None)
