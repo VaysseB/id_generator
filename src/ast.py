@@ -262,7 +262,7 @@ class Formatter:
             yield self._raw("up to ", rpt.max, " times",
                        (", not greedy" if not rpt.greedy else ""))
         elif rpt.max is None:
-            yield self._raw("at least ", rpt.max, " times",
+            yield self._raw("at least ", rpt.min, " times",
                        (", not greedy" if not rpt.greedy else ""))
         else:
             yield self._raw("between ", rpt.min, " and ", rpt.max,
@@ -276,22 +276,6 @@ def print(ast):
 
 #-----------------------------------------------------------------------------
 class Walker:
-    visitor_methods = (
-        "visit_Group",
-        "visit_MatchBegin",
-        "visit_MatchEnd",
-        "visit_Alternative",
-        "visit_SingleChar",
-        "visit_PatternChar",
-        "visit_Range",
-        "visit_CharClass",
-        "visit_NoneOrOnce",
-        "visit_NoneOrMore",
-        "visit_OneTime",
-        "visit_OneOrMore",
-        "visit_Between"
-    )
-
     def __init__(self):
         self.walkers = {
             Group       : self._walk_Group,
